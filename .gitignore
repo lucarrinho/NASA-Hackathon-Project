@@ -1,0 +1,8 @@
+# Build do Maven (não versionar)
+hemospace-mvp/backend-java/target/
+
+# IDE / sistema
+.idea/
+.vscode/
+*.iml
+.DS_Store
