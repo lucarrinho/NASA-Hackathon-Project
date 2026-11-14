@@ -1,0 +1,13 @@
+{
+  "_note": "Documentação das regras. HemodynamicService ainda usa constantes equivalentes; carregar deste arquivo é a próxima etapa.",
+  "indicators": {
+    "map": { "unit": "mmHg", "blue_below": 70, "green_max_inclusive": 100, "above_100": "YELLOW (RED pendente)" },
+    "abi": { "unit": "index", "blue_below": 0.90, "green_max_inclusive": 1.30, "above_1_30": "YELLOW" },
+    "pulse_pressure": { "unit": "mmHg", "red_below": 25, "green_max_inclusive": 60, "above_60": "YELLOW" }
+  },
+  "gravity_profiles": ["0G_ORBIT", "1_6G_MOON", "3_8G_MARS", "1G_EARTH"],
+  "provisional_rules": {
+    "head_neck": "ITB<0.90 E jugular DILATED = RED; apenas um = YELLOW; PPG fora da regra",
+    "orthostatic_alert": { "gravity": ["3_8G_MARS", "1G_EARTH"], "hr_min_bpm": 95, "pp_max_mmhg": 30 }
+  }
+}
