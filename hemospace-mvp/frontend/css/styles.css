@@ -1,0 +1,288 @@
+/* ==========================================================================
+   HemoSpace v1.0 — styles.css  [Dev 1]
+   Tela única, alta legibilidade (projeção em telão), paleta de 4 cores.
+   ========================================================================== */
+
+:root {
+  /* Paleta oficial de status (spec §4.2) */
+  --blue: #2563EB;   /* hipoperfusão / déficit de volume */
+  --green: #16A34A;  /* equilíbrio hemodinâmico */
+  --amber: #D97706;  /* alerta moderado / adaptação em curso */
+  --red: #DC2626;    /* risco crítico / notificar médicos de voo */
+
+  --bg: #0b1220;
+  --panel: #111a2e;
+  --panel-2: #172440;
+  --border: #25365a;
+  --text: #e8eefb;
+  --muted: #9bb0d3;
+  --accent: #38bdf8;
+}
+
+/* ---------- Classes de status (usadas por cards, badges e SVG) ---------- */
+.st-blue  { --st: #2563EB; --st-rgb: 37, 99, 235; }
+.st-green { --st: #16A34A; --st-rgb: 22, 163, 74; }
+.st-amber { --st: #D97706; --st-rgb: 217, 119, 6; }
+.st-red   { --st: #DC2626; --st-rgb: 220, 38, 38; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+h2 { margin: 0 0 .6rem; font-size: 1.25rem; }
+h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+
+button { font: inherit; cursor: pointer; }
+button:focus-visible,
+.zone-card:focus-visible,
+input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------------------------------- TOPBAR ---------------------------------- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem 1.4rem;
+  padding: .45rem 1rem;
+  background: #0a1020;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-info { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.brand-info strong { letter-spacing: .08em; color: var(--accent); }
+
+.gravity-controls,
+.demo-controls { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.gravity-controls > span,
+.demo-controls > span { color: var(--muted); font-weight: 600; }
+
+.grav-btn,
+.demo-btn,
+.tab-btn {
+  padding: .45rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  transition: background .15s, border-color .15s;
+}
+.grav-btn:hover, .demo-btn:hover, .tab-btn:hover { border-color: var(--accent); }
+
+.grav-btn.active { background: var(--accent); border-color: var(--accent); color: #04121f; font-weight: 700; }
+.demo-btn { border-style: dashed; }
+.demo-btn.active { background: #7c3aed; border-color: #7c3aed; border-style: solid; font-weight: 700; }
+
+.conn-status {
+  padding: .15rem .6rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  background: #1e293b;
+  color: var(--muted);
+}
+.conn-status.online  { background: rgba(22, 163, 74, .2);  color: #86efac; }
+.conn-status.offline { background: rgba(217, 119, 6, .25); color: #fcd34d; }
+
+/* ------------------------------- GRID CENTRAL ------------------------------- */
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 5fr) 7fr;
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+}
+
+.panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* ----------------------------- PAINEL ESQUERDO ----------------------------- */
+.bodymap-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 1.2fr;
+  gap: 14px;
+  align-items: start;
+}
+
+#bodymap-slot { min-height: 320px; }
+#bodymap-slot:not(:has(svg))::before {
+  content: "[Dev 3] SVG anatômico aqui";
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: .9rem;
+}
+#bodymap-slot svg { width: 100%; height: auto; max-height: 100%; }
+
+/* Grupos do SVG anatômico herdam a cor da classe st-* (Dev 3: use class="zone st-green") */
+#bodymap-slot .zone {
+  fill: var(--st, #475569);
+  fill-opacity: .88;
+  stroke: #0b1220;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: fill .25s, stroke .15s;
+}
+#bodymap-slot .zone:hover { stroke: #fff; }
+#bodymap-slot .zone.selected { stroke: #fff; stroke-width: 4; }
+
+.zones-cards { display: flex; flex-direction: column; gap: 10px; }
+
+.zone-card {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  padding: .7rem .9rem;
+  border-left: 8px solid var(--st, #475569);
+  border-radius: 8px;
+  background: rgba(var(--st-rgb, 71, 85, 105), .16);
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+}
+.zone-card:hover { transform: translateX(2px); background: rgba(var(--st-rgb, 71, 85, 105), .26); }
+.zone-card.selected { outline: 3px solid #fff; outline-offset: 1px; background: rgba(var(--st-rgb, 71, 85, 105), .32); }
+.zone-card strong { font-size: 1rem; }
+.zone-status-label { font-size: .92rem; color: var(--text); opacity: .9; }
+
+/* ------------------------------ PAINEL DIREITO ------------------------------ */
+.clinical-header { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; }
+.clinical-header h2 { margin: 0; }
+
+.status-badge {
+  padding: .35rem .9rem;
+  border-radius: 999px;
+  background: var(--st, #475569);
+  color: #fff;
+  font-weight: 800;
+  font-size: .95rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+.chart-container {
+  position: relative;      /* exigido pelo Chart.js responsivo */
+  height: clamp(150px, 26vh, 240px);
+  margin: .8rem 0;
+  padding: .5rem;
+  background: var(--panel-2);
+  border-radius: 10px;
+}
+
+.didactic-box,
+.actions-box {
+  margin-top: .8rem;
+  padding: .8rem 1rem;
+  background: var(--panel-2);
+  border-radius: 10px;
+}
+.didactic-box { border-left: 6px solid var(--accent); }
+.actions-box  { border-left: 6px solid var(--st, var(--green)); }
+.actions-box ul { margin: 0; padding-left: 1.2rem; }
+.actions-box li { margin: .3rem 0; }
+.actions-box li.critical { font-weight: 800; color: #fecaca; }
+.didactic-box p { margin: 0; }
+
+/* ------------------------------ MÓDULO INFERIOR ------------------------------ */
+.bottom-module {
+  max-height: 36vh;
+  overflow: auto;
+  padding: .7rem 1rem 1rem;
+  background: #0a1020;
+  border-top: 1px solid var(--border);
+}
+
+.tabs-bar { display: flex; align-items: stretch; justify-content: space-between; gap: .8rem; margin-bottom: .6rem; }
+.tab-buttons { display: flex; flex: 1; gap: .4rem; min-width: 0; }
+.tab-btn { flex: 1 1 0; min-width: 0; padding: .4rem .6rem; font-size: .84rem; line-height: 1.25; }
+.tabs-bar .btn-primary { flex: none; }
+.tab-btn.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+.btn-primary {
+  padding: .7rem 1.6rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #04121f;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: .6; cursor: progress; }
+
+.tab-content[hidden] { display: none !important; }
+
+.inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .7rem; }
+.inputs-grid label { display: flex; flex-direction: column; gap: .25rem; color: var(--muted); font-size: .85rem; font-weight: 600; }
+.inputs-grid input {
+  padding: .5rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.inputs-grid input:invalid { border-color: var(--red); }
+
+#optical-scanner-container,
+#ultrasound-container { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+#ppg-video, #ppg-canvas, #ultrasound-canvas { background: #000; border-radius: 8px; max-width: 100%; }
+.optical-controls { display: flex; flex-direction: column; gap: .6rem; }
+.ultrasound-presets { display: flex; gap: .5rem; flex-wrap: wrap; }
+.us-sample-btn, #btn-simulate-ppg {
+  padding: .45rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+.us-sample-btn:hover, #btn-simulate-ppg:hover { border-color: var(--accent); }
+.us-sample-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+/* ---------------------------------- TOAST ---------------------------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%) translateY(20px);
+  max-width: 90vw;
+  padding: .7rem 1.2rem;
+  border-radius: 10px;
+  background: #7f1d1d;
+  color: #fff;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  z-index: 50;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ------------------------------- RESPONSIVO ------------------------------- */
+@media (max-width: 900px) {
+  body { height: auto; overflow: auto; display: block; }
+  .main-grid { grid-template-columns: 1fr; }
+  .bodymap-layout { grid-template-columns: 1fr; }
+  .bottom-module { max-height: none; }
+  .tabs-bar, .tab-buttons { flex-wrap: wrap; flex-direction: column; }
+}
