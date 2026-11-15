@@ -50,6 +50,7 @@
     missionDay: 42,
     gravityProfile: '0G_ORBIT',
     selectedZone: 'head_neck',
+    panelOpen: true,            // right panel (regional diagnosis) open/closed
     data: null,                 // latest AstronautStateResponse
     lastPayload: null,          // latest ReadingRequest sent
     activePreset: null,         // 'A' | 'B' | 'C' | null
@@ -228,7 +229,7 @@
 
   function highlightSelected() {
     ZONE_KEYS.forEach((key) => {
-      const on = key === S.selectedZone;
+      const on = S.panelOpen && key === S.selectedZone;
       const card = $('card-' + key);
       if (card) card.classList.toggle('selected', on);
       const svgZone = $(SVG_ZONE_IDS[key]);
@@ -259,10 +260,26 @@
       console.warn('[HemoSpace] unknown zone:', zoneKey);
       return;
     }
+    // Clicking the already-open region closes the panel; any other click opens it.
+    const closing = S.panelOpen && zoneKey === S.selectedZone;
     S.selectedZone = zoneKey;
+    setPanelOpen(!closing);
     highlightSelected();
-    if (S.data) callModule('ClinicalPanel', 'render', zoneKey, S.data);
-    emit('hemospace:zone', { zoneKey });
+    if (!closing && S.data) callModule('ClinicalPanel', 'render', zoneKey, S.data);
+    emit('hemospace:zone', { zoneKey: closing ? null : zoneKey });
+  }
+
+  /** Shows/hides the regional diagnosis panel and lets the body map use the free space. */
+  function setPanelOpen(open) {
+    S.panelOpen = !!open;
+    const panel = $('clinical-panel');
+    if (panel) panel.hidden = !S.panelOpen;
+    const grid = document.querySelector('.main-grid');
+    if (grid) grid.classList.toggle('panel-collapsed', !S.panelOpen);
+    ZONE_KEYS.forEach((key) => {
+      const card = $('card-' + key);
+      if (card) card.setAttribute('aria-expanded', String(S.panelOpen && key === S.selectedZone));
+    });
   }
 
   // ------------------------------------------------------------------ gravity
@@ -346,6 +363,8 @@
       if (!card) return;
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-controls', 'clinical-panel');
+      card.setAttribute('aria-expanded', String(S.panelOpen && key === S.selectedZone));
       card.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter' || ev.key === ' ') {
           ev.preventDefault();
@@ -397,7 +416,7 @@
 
   // Public API (globals required by the spec + debugging shortcuts)
   window.selectZone = selectZone;
-  window.HemoApp = { runDiagnosis, applyPreset, setGravity, selectZone, switchTab, showToast, PRESETS };
+  window.HemoApp = { runDiagnosis, applyPreset, setGravity, selectZone, setPanelOpen, switchTab, showToast, PRESETS };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

@@ -105,6 +105,9 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   min-height: 0;
 }
 
+.main-grid.panel-collapsed { grid-template-columns: 1fr; }
+#clinical-panel[hidden] { display: none; }
+
 .panel {
   min-height: 0;
   overflow: auto;
