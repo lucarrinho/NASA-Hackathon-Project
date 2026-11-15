@@ -1,58 +1,58 @@
-# HemoSpace MVP — Monitor Hemodinâmico Regional
+# HemoSpace MVP — Regional Hemodynamic Monitor
 
-Contrato de integração mantido pelo Dev 1. Detalhes completos na Especificação Técnica (PDF).
+Integration contract maintained by Dev 1. Full details in the Technical Specification (PDF).
 
-## Como rodar
+## How to run
 
 ```bash
-# Backend (porta 8080)
+# Backend (port 8080)
 cd backend-java && mvn spring-boot:run
 
-# Frontend: abrir frontend/index.html direto no navegador
-# (ou servir com Live Server / `python3 -m http.server 5500` dentro de frontend/)
+# Frontend: open frontend/index.html directly in the browser
+# (or serve with Live Server / `python3 -m http.server 5500` inside frontend/)
 ```
 
-Se o Java estiver fora do ar, `api.js` cai no cálculo local após 500 ms e o topo mostra **"Modo offline"**.
+If Java is down, `api.js` falls back to local calculation after 500 ms and the top bar shows **"Offline mode"**.
 
-## Propriedade de pastas
+## Folder ownership
 
-| Dev | Arquivos |
+| Dev | Files |
 |-----|----------|
-| 1 | `HemospaceApplication`, `config/CorsConfig`, `index.html` (estrutura), `css/styles.css`, `js/app.js` |
+| 1 | `HemospaceApplication`, `config/CorsConfig`, `index.html` (structure), `css/styles.css`, `js/app.js` |
 | 2 | `model/`, `service/`, `controller/`, `clinical_rules.json`, `astronaut_history.json` |
-| 3 | SVG em `#bodymap-slot`, `js/bodymap.js` |
-| 4 | painel direito (`#clinical-panel`), `js/panel.js` |
+| 3 | SVG in `#bodymap-slot`, `js/bodymap.js` |
+| 4 | right panel (`#clinical-panel`), `js/panel.js` |
 | 5 | `js/api.js`, `js/inputs.js` |
 | 6 | `js/ultrasound.js`, `assets/ultrasound/` |
 
-`api.js`, `bodymap.js`, `panel.js`, `inputs.js` e `ultrasound.js` estão como **stubs** marcados no topo — substituam o arquivo inteiro.
+`api.js`, `bodymap.js`, `panel.js`, `inputs.js` and `ultrasound.js` are **stubs** marked at the top — replace the entire file.
 
-## Funções globais (contrato)
+## Global functions (contract)
 
-| Quem expõe | Assinatura | Quem chama |
+| Exposed by | Signature | Called by |
 |------------|-----------|-----------|
 | Dev 5 | `ApiClient.postReading(payload) -> Promise<AstronautStateResponse>` | app.js |
-| Dev 5 (opcional) | `ApiClient.loadPreset(code)` — só usado se `USE_BACKEND_PRESETS = true` em app.js | app.js |
+| Dev 5 (optional) | `ApiClient.loadPreset(code)` — only used if `USE_BACKEND_PRESETS = true` in app.js | app.js |
 | Dev 3 | `BodyMap.render(zones, gravityProfile)` | app.js |
 | Dev 4 | `ClinicalPanel.render(zoneKey, data)` | app.js |
-| Dev 1 | `window.selectZone(zoneKey)` — chaves: `head_neck`, `thorax_heart`, `upper_limbs`, `lower_limbs` | bodymap.js, cards |
+| Dev 1 | `window.selectZone(zoneKey)` — keys: `head_neck`, `thorax_heart`, `upper_limbs`, `lower_limbs` | bodymap.js, cards |
 | Dev 1 | `window.HemoApp.runDiagnosis()` | inputs.js / ultrasound.js |
 
-Opcional em `ApiClient.postReading`: devolver `_offline: true` na resposta calculada localmente (liga o indicador de modo offline).
+Optional in `ApiClient.postReading`: return `_offline: true` in the locally computed response (turns on the offline-mode indicator).
 
-## Estado compartilhado (`window.HemoState`)
+## Shared state (`window.HemoState`)
 
-`gravityProfile`, `selectedZone`, `data` (última resposta), `lastPayload`, `activePreset`, `offline` — somente leitura para os outros devs.
+`gravityProfile`, `selectedZone`, `data` (latest response), `lastPayload`, `activePreset`, `offline` — read-only for the other devs.
 
-Escrita permitida:
-- `ppgCapillaryRefillSec` (número, s) — **Dev 5** após leitura óptica
+Write access allowed:
+- `ppgCapillaryRefillSec` (number, s) — **Dev 5** after the optical reading
 - `ultrasoundPreset` (`'jugular_normal' | 'jugular_dilated' | 'femoral_reduced' | 'NONE'`) — **Dev 6**
 
-## Eventos (`document.addEventListener`)
+## Events (`document.addEventListener`)
 
 `hemospace:tab` `{tab}` · `hemospace:gravity` `{gravityProfile}` · `hemospace:preset` `{code, ultrasoundPreset}` · `hemospace:zone` `{zoneKey}`
 
-## Payload enviado (`POST /api/v1/readings`) — camelCase, igual ao record `ReadingRequest`
+## Payload sent (`POST /api/v1/readings`) — camelCase, same as the `ReadingRequest` record
 
 ```json
 { "astronautId": "AST-04", "gravityProfile": "0G_ORBIT",
@@ -61,9 +61,9 @@ Escrita permitida:
   "ppgCapillaryRefillSec": 1.5, "ultrasoundPreset": "NONE" }
 ```
 
-A **resposta** é snake_case (`astronaut_id`, `computed_metrics`, `zones`…). Dev 2: usar `@JsonProperty` nos records de resposta (ou um DTO separado) para não quebrar a entrada camelCase.
+The **response** is snake_case (`astronaut_id`, `computed_metrics`, `zones`…). Dev 2: use `@JsonProperty` on the response records (or a separate DTO) so the camelCase input does not break.
 
-## Classes e cores
+## Classes and colors
 
-`.st-blue` `#2563EB` · `.st-green` `#16A34A` · `.st-amber` `#D97706` · `.st-red` `#DC2626`. Mapeamento: `YELLOW` → `st-amber`.
-No SVG (Dev 3): `<g id="zone-head" class="zone st-green">` já herda a cor via CSS.
+`.st-blue` `#2563EB` · `.st-green` `#16A34A` · `.st-amber` `#D97706` · `.st-red` `#DC2626`. Mapping: `YELLOW` → `st-amber`.
+In the SVG (Dev 3): `<g id="zone-head" class="zone st-green">` already inherits the color via CSS.
