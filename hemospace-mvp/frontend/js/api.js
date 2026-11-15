@@ -94,6 +94,13 @@
     const ORTHOSTATIC_HR_MIN_BPM = 95;
     const ORTHOSTATIC_PP_MAX_MMHG = 30;
 
+    // Limiares espelhados de HemodynamicService.java / clinical_rules.json
+    const ABI_BLUE_MAX = 0.9;          // ITB <= 0,90: anormal
+    const ABI_GREEN_MAX = 1.4;         // ITB > 1,40: não compressível (decisão: 1,40)
+    const PP_RED_BELOW_MMHG = 25;
+    const PP_RED_BELOW_FRACTION = 0.25;
+    const CAPILLARY_REFILL_MAX_SEC = 2.0; // PROVISÓRIO
+
     const round2 = (v) => Math.round(v * 100) / 100;
     const z = (status, label, action) => ({ status, label, action });
 
@@ -102,18 +109,21 @@
     const calculatePP = (sys, dia) => sys - dia;
 
     const classifyMAP = (m) => (m < 70 ? 'BLUE' : m <= 100 ? 'GREEN' : 'YELLOW');
-    const classifyABI = (a) => (a < 0.9 ? 'BLUE' : a <= 1.3 ? 'GREEN' : 'YELLOW');
-    const classifyPP = (pp) => (pp < 25 ? 'RED' : pp <= 60 ? 'GREEN' : 'YELLOW');
+    const classifyABI = (a) => (a <= ABI_BLUE_MAX ? 'BLUE' : a <= ABI_GREEN_MAX ? 'GREEN' : 'YELLOW');
+    const classifyPP = (pp, sys) => ((pp < PP_RED_BELOW_MMHG || (sys > 0 && pp / sys < PP_RED_BELOW_FRACTION)) ? 'RED' : pp <= 60 ? 'GREEN' : 'YELLOW');
 
+    // Ultrassom jugular = marcador principal; ITB baixo sozinho só rebaixa verde -> amarelo.
     function headNeck(abi, us) {
-      const lowAbi = abi < 0.9;
-      const dilated = us === 'DILATED';
-      if (lowAbi && dilated) {
+      const jugularDilated = us === 'DILATED';
+      const lowAbi = classifyABI(abi) === 'BLUE';
+      if (jugularDilated && lowAbi) {
         return z('RED', 'Congestão Cefálica Severa (risco SANS)',
           'Aplicar cintas de contenção nas coxas (Braslet), elevar tronco no repouso e realizar exame ocular.');
       }
-      if (lowAbi || dilated) {
-        return z('YELLOW', 'Congestão Cefálica Leve', 'Iniciar LBNP 20 min e monitorar visão.');
+      if (jugularDilated) return z('YELLOW', 'Congestão Cefálica Leve', 'Iniciar LBNP 20 min e monitorar visão.');
+      if (lowAbi) {
+        return z('YELLOW', 'Perfusão Distal Reduzida (vigiar congestão cefálica)',
+          'Confirmar com ultrassom jugular e monitorar visão.');
       }
       return z('GREEN', 'Sem Congestão Cefálica', 'Nenhuma intervenção necessária.');
     }
@@ -124,26 +134,33 @@
     }
 
     function thorax(map, pp, p) {
-      if (classifyPP(pp) === 'RED') {
+      const ppClass = classifyPP(pp, p.armSystolicMmhg);
+      if (ppClass === 'RED') {
         return z('RED', 'Pressão de Pulso Crítica (hipovolemia)',
           'Protocolo urgente de reposição volêmica e suspensão de atividade extraveicular (EVA).');
       }
+      // HEURÍSTICA DE DEMONSTRAÇÃO (não é regra clínica validada)
       if (orthostaticRisk(pp, p)) {
-        return z('YELLOW', 'Risco de Intolerância Ortostática',
+        return z('YELLOW', 'Risco de Intolerância Ortostática (alerta de demonstração)',
           'Iniciar pré-hidratação e bloquear saída imediata do módulo.');
       }
       const m = classifyMAP(map);
       if (m === 'BLUE') return z('BLUE', 'PAM Baixa', 'Hidratação isotônica.');
       if (m === 'YELLOW') return z('YELLOW', 'PAM Elevada', 'Repouso e redução de sódio.');
-      return classifyPP(pp) === 'YELLOW'
+      return ppClass === 'YELLOW'
         ? z('YELLOW', 'Pressão de Pulso Elevada', 'Monitorar condição.')
         : z('GREEN', 'Débito Cardíaco Estável', 'Manter rotina aeróbica padrão.');
     }
 
-    function upperLimbs(map) {
+    // Retorno capilar só pode rebaixar verde -> amarelo; nunca gera vermelho.
+    function upperLimbs(map, refillSec) {
       const m = classifyMAP(map);
       if (m === 'BLUE') return z('BLUE', 'Pressão Sistêmica Baixa', 'Hidratação isotônica.');
       if (m === 'YELLOW') return z('YELLOW', 'Pressão Sistêmica Elevada', 'Repouso e redução de sódio.');
+      if (refillSec > CAPILLARY_REFILL_MAX_SEC) {
+        return z('YELLOW', 'Perfusão Periférica Reduzida (retorno capilar lento)',
+          'Repetir a medição após repouso e reavaliar.');
+      }
       return z('GREEN', 'Perfusão Sistêmica Normal', 'Nenhuma intervenção necessária.');
     }
 
@@ -163,6 +180,7 @@
       const map = calculateMAP(p.armSystolicMmhg, p.armDiastolicMmhg);
       const abi = calculateABI(p.ankleSystolicMmhg, p.armSystolicMmhg);
       const pp = calculatePP(p.armSystolicMmhg, p.armDiastolicMmhg);
+      const abiR = round2(abi); // classifica com o valor mostrado na tela
 
       return {
         astronaut_id: p.astronautId,
@@ -174,10 +192,10 @@
           pulse_pressure_mmhg: round2(pp)
         },
         zones: {
-          head_neck: headNeck(abi, p.ultrasoundPreset),
+          head_neck: headNeck(abiR, p.ultrasoundPreset),
           thorax_heart: thorax(map, pp, p),
-          upper_limbs: upperLimbs(map),
-          lower_limbs: lowerLimbs(abi)
+          upper_limbs: upperLimbs(map, p.ppgCapillaryRefillSec),
+          lower_limbs: lowerLimbs(abiR)
         },
         history: LOCAL_HISTORY.map((h) => Object.assign({}, h))
       };

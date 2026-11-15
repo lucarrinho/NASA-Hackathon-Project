@@ -32,6 +32,17 @@ public class HemodynamicService {
     static final double ORTHOSTATIC_PP_MAX_MMHG = 30;
     // ================================================================
 
+        // ===== LIMIARES (espelhados em clinical_rules.json) =====
+    /** ITB <= 0,90: anormal (AHA/ACC). */
+    static final double ABI_BLUE_MAX_INCLUSIVE = 0.90;
+    /** ITB > 1,40: artérias não compressíveis (AHA/ACC). Decisão da equipe: 1,40 (e não 1,30). */
+    static final double ABI_GREEN_MAX_INCLUSIVE = 1.40;
+    /** Pressão de pulso: vermelho se < 25 mmHg OU < 25% da sistólica ("estreita"). */
+    static final double PP_RED_BELOW_MMHG = 25;
+    static final double PP_RED_BELOW_FRACTION = 0.25;
+    /** PROVISÓRIO: retorno capilar lento (s). Confirmar com revisor de saúde. */
+    static final double CAPILLARY_REFILL_MAX_SEC = 2.0;
+
     private record History(int missionDay, List<HistoryPoint> points) {}
 
     private final Map<String, History> histories = new ConcurrentHashMap<>();
@@ -75,13 +86,20 @@ public class HemodynamicService {
     }
 
     public String classifyABI(double abi) {
-        if (abi < 0.90) return "BLUE";
-        if (abi <= 1.30) return "GREEN";
+        if (abi <= ABI_BLUE_MAX_INCLUSIVE) return "BLUE";
+        if (abi <= ABI_GREEN_MAX_INCLUSIVE) return "GREEN";
         return "YELLOW";
     }
 
     public String classifyPulsePressure(double pp) {
         if (pp < 25) return "RED";
+        if (pp <= 60) return "GREEN";
+        return "YELLOW";
+    }
+
+    /** Absoluta OU proporcional (PP < 25% da sistólica). */
+    public String classifyPulsePressure(double pp, double systolic) {
+        if (pp < PP_RED_BELOW_MMHG || (systolic > 0 && pp / systolic < PP_RED_BELOW_FRACTION)) return "RED";
         if (pp <= 60) return "GREEN";
         return "YELLOW";
     }
@@ -122,11 +140,12 @@ public class HemodynamicService {
         double abi = calculateABI(req.ankleSystolicMmhg(), req.armSystolicMmhg());
         double pp = calculatePulsePressure(req.armSystolicMmhg(), req.armDiastolicMmhg());
 
+        double abiR = round2(abi); // classifica com o mesmo valor mostrado na tela (ex.: 0,90 -> azul)
         Map<String, ZoneStatusDTO> zones = new LinkedHashMap<>();
-        zones.put("head_neck", headNeck(abi, req.ultrasoundPreset()));
+        zones.put("head_neck", headNeck(abiR, req.ultrasoundPreset()));
         zones.put("thorax_heart", thorax(map, pp, req));
-        zones.put("upper_limbs", upperLimbs(map));
-        zones.put("lower_limbs", lowerLimbs(abi));
+        zones.put("upper_limbs", upperLimbs(map, req.ppgCapillaryRefillSec()));
+        zones.put("lower_limbs", lowerLimbs(abiR));
 
         return new AstronautStateResponse(
                 req.astronautId(), h.missionDay(), req.gravityProfile(),
@@ -136,30 +155,38 @@ public class HemodynamicService {
 
     // ------------------------------------------------------------------ zonas
 
-    /** PROVISÓRIO: ITB<0,90 e jugular dilatada => RED; só um dos dois => YELLOW. PPG ainda fora da regra. */
+    /**
+     * Ultrassom jugular é o marcador principal. ITB baixo sozinho só rebaixa verde -> amarelo.
+     * Vermelho = jugular dilatada CONFIRMADA por ITB <= 0,90 (mantém o Cenário B da especificação).
+     */
     private ZoneStatusDTO headNeck(double abi, String ultrasound) {
-        boolean lowAbi = abi < 0.90;
-        boolean dilated = "DILATED".equals(ultrasound);
-        if (lowAbi && dilated)
+        boolean jugularDilated = "DILATED".equals(ultrasound);
+        boolean lowAbi = classifyABI(abi).equals("BLUE");
+        if (jugularDilated && lowAbi)
             return new ZoneStatusDTO("RED", "Congestão Cefálica Severa (risco SANS)",
                     "Aplicar cintas de contenção nas coxas (Braslet), elevar tronco no repouso e realizar exame ocular.");
-        if (lowAbi || dilated)
+        if (jugularDilated)
             return new ZoneStatusDTO("YELLOW", "Congestão Cefálica Leve",
                     "Iniciar LBNP 20 min e monitorar visão.");
+        if (lowAbi)
+            return new ZoneStatusDTO("YELLOW", "Perfusão Distal Reduzida (vigiar congestão cefálica)",
+                    "Confirmar com ultrassom jugular e monitorar visão.");
         return new ZoneStatusDTO("GREEN", "Sem Congestão Cefálica", "Nenhuma intervenção necessária.");
     }
 
     private ZoneStatusDTO thorax(double map, double pp, ReadingRequest req) {
-        if (classifyPulsePressure(pp).equals("RED"))
+        String ppClass = classifyPulsePressure(pp, req.armSystolicMmhg());
+        if (ppClass.equals("RED"))
             return new ZoneStatusDTO("RED", "Pressão de Pulso Crítica (hipovolemia)",
                     "Protocolo urgente de reposição volêmica e suspensão de atividade extraveicular (EVA).");
+        // HEURÍSTICA DE DEMONSTRAÇÃO (não é regra clínica validada): ver orthostaticRisk()
         if (orthostaticRisk(pp, req))
-            return new ZoneStatusDTO("YELLOW", "Risco de Intolerância Ortostática",
+            return new ZoneStatusDTO("YELLOW", "Risco de Intolerância Ortostática (alerta de demonstração)",
                     "Iniciar pré-hidratação e bloquear saída imediata do módulo.");
         return switch (classifyMAP(map)) {
             case "BLUE" -> new ZoneStatusDTO("BLUE", "PAM Baixa", "Hidratação isotônica.");
             case "YELLOW" -> new ZoneStatusDTO("YELLOW", "PAM Elevada", "Repouso e redução de sódio.");
-            default -> classifyPulsePressure(pp).equals("YELLOW")
+            default -> ppClass.equals("YELLOW")
                     ? new ZoneStatusDTO("YELLOW", "Pressão de Pulso Elevada", "Monitorar condição.")
                     : new ZoneStatusDTO("GREEN", "Débito Cardíaco Estável", "Manter rotina aeróbica padrão.");
         };
@@ -170,12 +197,17 @@ public class HemodynamicService {
         return transition && req.heartRateBpm() >= ORTHOSTATIC_HR_MIN_BPM && pp < ORTHOSTATIC_PP_MAX_MMHG;
     }
 
-    private ZoneStatusDTO upperLimbs(double map) {
-        return switch (classifyMAP(map)) {
+    /** Retorno capilar (PPG do dedo) só pode rebaixar verde -> amarelo; nunca gera vermelho. */
+    private ZoneStatusDTO upperLimbs(double map, double refillSec) {
+        ZoneStatusDTO base = switch (classifyMAP(map)) {
             case "BLUE" -> new ZoneStatusDTO("BLUE", "Pressão Sistêmica Baixa", "Hidratação isotônica.");
             case "YELLOW" -> new ZoneStatusDTO("YELLOW", "Pressão Sistêmica Elevada", "Repouso e redução de sódio.");
             default -> new ZoneStatusDTO("GREEN", "Perfusão Sistêmica Normal", "Nenhuma intervenção necessária.");
         };
+        if (base.status().equals("GREEN") && refillSec > CAPILLARY_REFILL_MAX_SEC)
+            return new ZoneStatusDTO("YELLOW", "Perfusão Periférica Reduzida (retorno capilar lento)",
+                    "Repetir a medição após repouso e reavaliar.");
+        return base;
     }
 
     private ZoneStatusDTO lowerLimbs(double abi) {

@@ -150,3 +150,50 @@ test('ultrassom: Cenário B reflete a amostra e Cenário C mostra "sem exame"', 
   assert.match(w.document.getElementById('ultrasound-result').textContent, /Sem exame/);
   w.close();
 });
+
+// ---------------------------------------------------------------- regras clínicas (espelho do Java)
+const base = { astronautId: 'AST-04', gravityProfile: '0G_ORBIT', armSystolicMmhg: 118, armDiastolicMmhg: 76,
+  ankleSystolicMmhg: 112, heartRateBpm: 68, calfCircumferenceCm: 0, ppgCapillaryRefillSec: 1.5, ultrasoundPreset: 'NONE' };
+const zonesOf = (w, over) => w.ApiClient.computeLocal({ ...base, ...over }).zones;
+
+test('ITB: 0,90 exato é azul; 1,40 é verde; acima de 1,40 é amarelo', async () => {
+  const w = await loadPage();
+  assert.equal(zonesOf(w, { armSystolicMmhg: 120, ankleSystolicMmhg: 108 }).lower_limbs.status, 'BLUE');   // 0,90
+  assert.equal(zonesOf(w, { armSystolicMmhg: 100, ankleSystolicMmhg: 140, armDiastolicMmhg: 70 }).lower_limbs.status, 'GREEN'); // 1,40
+  assert.equal(zonesOf(w, { armSystolicMmhg: 100, ankleSystolicMmhg: 141, armDiastolicMmhg: 70 }).lower_limbs.status, 'YELLOW'); // 1,41
+  w.close();
+});
+
+test('pressão de pulso: critério proporcional (<25% da sistólica) é vermelho', async () => {
+  const w = await loadPage();
+  // 160/125: PP 35 mmHg (>25 absoluto) mas só 21,9% da sistólica
+  assert.equal(zonesOf(w, { armSystolicMmhg: 160, armDiastolicMmhg: 125, ankleSystolicMmhg: 160 }).thorax_heart.status, 'RED');
+  // 118/76 (PP 42 = 35,6%) segue verde
+  assert.equal(zonesOf(w, {}).thorax_heart.status, 'GREEN');
+  w.close();
+});
+
+test('cabeça: jugular pesa mais; ITB sozinho só vai a amarelo; vermelho exige confirmação', async () => {
+  const w = await loadPage();
+  assert.equal(zonesOf(w, { ultrasoundPreset: 'jugular_normal' }).head_neck.status, 'GREEN');
+  assert.equal(zonesOf(w, { ankleSystolicMmhg: 100 }).head_neck.status, 'YELLOW');                       // ITB 0,85 sozinho
+  assert.equal(zonesOf(w, { ultrasoundPreset: 'jugular_dilated' }).head_neck.status, 'YELLOW');          // jugular sozinha
+  assert.equal(zonesOf(w, { ultrasoundPreset: 'jugular_dilated', ankleSystolicMmhg: 100 }).head_neck.status, 'RED');
+  w.close();
+});
+
+test('retorno capilar lento rebaixa membros superiores a amarelo (nunca vermelho)', async () => {
+  const w = await loadPage();
+  assert.equal(zonesOf(w, { ppgCapillaryRefillSec: 2.0 }).upper_limbs.status, 'GREEN');
+  assert.equal(zonesOf(w, { ppgCapillaryRefillSec: 2.5 }).upper_limbs.status, 'YELLOW');
+  assert.equal(zonesOf(w, { ppgCapillaryRefillSec: 9 }).upper_limbs.status, 'YELLOW');
+  w.close();
+});
+
+test('alerta ortostático vem rotulado como demonstração', async () => {
+  const w = await loadPage();
+  const t = zonesOf(w, { gravityProfile: '3_8G_MARS', armSystolicMmhg: 96, armDiastolicMmhg: 68, ankleSystolicMmhg: 84, heartRateBpm: 98 }).thorax_heart;
+  assert.equal(t.status, 'YELLOW');
+  assert.match(t.label, /demonstração/);
+  w.close();
+});

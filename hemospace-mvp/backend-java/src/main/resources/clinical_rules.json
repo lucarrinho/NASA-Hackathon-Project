@@ -1,13 +1,32 @@
 {
-  "_note": "Documentação das regras. HemodynamicService ainda usa constantes equivalentes; carregar deste arquivo é a próxima etapa.",
+  "_note": "Documentação das regras. HemodynamicService usa constantes equivalentes (topo da classe). Qualquer mudança aqui deve ser espelhada em HemodynamicService.java E no LocalEngine do api.js.",
   "indicators": {
     "map": { "unit": "mmHg", "blue_below": 70, "green_max_inclusive": 100, "above_100": "YELLOW (RED pendente)" },
-    "abi": { "unit": "index", "blue_below": 0.90, "green_max_inclusive": 1.30, "above_1_30": "YELLOW" },
-    "pulse_pressure": { "unit": "mmHg", "red_below": 25, "green_max_inclusive": 60, "above_60": "YELLOW" }
+    "abi": {
+      "unit": "index", "blue_max_inclusive": 0.90, "green_max_inclusive": 1.40, "above_1_40": "YELLOW",
+      "source": "AHA/ACC: <=0,90 anormal; >1,40 artérias não compressíveis",
+      "decision": "a equipe adotou 1,40 (e não 1,30)",
+      "caveat": "ITB é validado para doença arterial periférica; aqui é sinal de perfusão distal (adaptação do projeto)"
+    },
+    "pulse_pressure": {
+      "unit": "mmHg", "red_below": 25, "red_below_fraction_of_systolic": 0.25,
+      "green_max_inclusive": 60, "above_60": "YELLOW",
+      "note": "vermelho se absoluta (<25 mmHg) OU proporcional (<25% da sistólica)"
+    },
+    "capillary_refill": {
+      "unit": "s", "yellow_above": 2.0, "zone": "upper_limbs", "max_severity": "YELLOW",
+      "status": "PROVISORIO - confirmar com revisor de saúde"
+    }
+  },
+  "informational_only": {
+    "calf_circumference_cm": "validado, mas não entra em nenhuma regra (o frontend envia 35,0 + variação)"
   },
   "gravity_profiles": ["0G_ORBIT", "1_6G_MOON", "3_8G_MARS", "1G_EARTH"],
   "provisional_rules": {
-    "head_neck": "ITB<0.90 E jugular DILATED = RED; apenas um = YELLOW; PPG fora da regra",
-    "orthostatic_alert": { "gravity": ["3_8G_MARS", "1G_EARTH"], "hr_min_bpm": 95, "pp_max_mmhg": 30 }
+    "head_neck": "jugular DILATED + ITB<=0,90 = RED; só jugular = YELLOW; só ITB<=0,90 = YELLOW (rebaixa de verde)",
+    "orthostatic_alert": {
+      "gravity": ["3_8G_MARS", "1G_EARTH"], "hr_min_bpm": 95, "pp_max_mmhg": 30,
+      "status": "HEURISTICA DE DEMONSTRACAO - sem base clínica validada"
+    }
   }
 }
