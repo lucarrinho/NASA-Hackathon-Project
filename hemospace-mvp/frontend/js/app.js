@@ -269,6 +269,17 @@
     emit('hemospace:zone', { zoneKey: closing ? null : zoneKey });
   }
 
+  /** Closes the diagnosis panel via the X button (same effect as clicking the open region again). */
+  function closePanel() {
+    if (!S.panelOpen) return;
+    const key = S.selectedZone;
+    setPanelOpen(false);
+    highlightSelected();
+    emit('hemospace:zone', { zoneKey: null });
+    const card = $('card-' + key);
+    if (card) card.focus(); // keyboard users keep their place
+  }
+
   /** Shows/hides the regional diagnosis panel and lets the body map use the free space. */
   function setPanelOpen(open) {
     S.panelOpen = !!open;
@@ -375,6 +386,8 @@
   }
 
   function bindEvents() {
+    const closeBtn = $('panel-close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', closePanel);
     document.querySelectorAll('.grav-btn').forEach((btn) => {
       btn.addEventListener('click', () => setGravity(btn.dataset.gravity));
     });
@@ -416,7 +429,7 @@
 
   // Public API (globals required by the spec + debugging shortcuts)
   window.selectZone = selectZone;
-  window.HemoApp = { runDiagnosis, applyPreset, setGravity, selectZone, setPanelOpen, switchTab, showToast, PRESETS };
+  window.HemoApp = { runDiagnosis, applyPreset, setGravity, selectZone, setPanelOpen, closePanel, switchTab, showToast, PRESETS };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
