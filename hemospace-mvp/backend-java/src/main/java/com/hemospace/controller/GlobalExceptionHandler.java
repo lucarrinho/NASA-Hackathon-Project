@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleMalformed(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", "INVALID_PAYLOAD", "message", "JSON malformado ou com tipos inválidos."));
+        return ResponseEntity.badRequest().body(Map.of("error", "INVALID_PAYLOAD", "message", "Malformed JSON or invalid types."));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneral(Exception ex) {
-        log.error("Erro interno", ex);
-        return ResponseEntity.status(500).body(Map.of("error", "INTERNAL_ERROR", "message", "Erro interno no processamento."));
+        log.error("Internal error", ex);
+        return ResponseEntity.status(500).body(Map.of("error", "INTERNAL_ERROR", "message", "Internal processing error."));
     }
 }

@@ -1,7 +1,7 @@
-/* HemoSpace — DEV3: mapa corporal.
-   Só apresenta o estado recebido; não calcula nada clínico.
-   Contrato: BodyMap.render(zones, gravityProfile) · clique/Enter/Espaço -> window.selectZone(zoneKey)
-   A classe de seleção (.selected) e o realce são aplicados pelo app.js (Dev1). */
+/* HemoSpace — DEV3: body map.
+   Only presents the received state; computes nothing clinical.
+   Contract: BodyMap.render(zones, gravityProfile) · click/Enter/Space -> window.selectZone(zoneKey)
+   The selection class (.selected) and highlighting are applied by app.js (Dev1). */
 (function () {
   'use strict';
 
@@ -25,29 +25,29 @@
       el.dataset.status = status;
     } else {
       el.dataset.status = 'UNKNOWN';
-      console.warn('BodyMap: status ausente/desconhecido em "' + zoneKey + '":', zoneData && zoneData.status);
+      console.warn('BodyMap: missing/unknown status in "' + zoneKey + '":', zoneData && zoneData.status);
     }
     if (zoneData && zoneData.label) el.setAttribute('aria-label', zoneData.label);
   }
 
-  // `hidden` não é confiável em elementos SVG: usa-se o atributo display.
+  // `hidden` is not reliable on SVG elements: the display attribute is used instead.
   function setShown(el, shown) {
     if (!el) return;
     if (shown) el.removeAttribute('display');
     else el.setAttribute('display', 'none');
   }
 
-  // REGRA VISUAL DE GRAVIDADE (proposta simples; validar com a equipe):
-  //  - 0g: fluxo cefálico (seta p/ cima, cheia).
-  //  - 1g: fluxo distal (seta p/ baixo, cheia).
-  //  - Lua (1/6g) e Marte (3/8g): ainda há gravidade, então a seta aponta p/ baixo como em 1g,
-  //    mas tracejada e mais fraca, proporcional à gravidade (Marte > Lua). É só um recurso
-  //    visual: não representa medição nem diagnóstico.
+  // VISUAL GRAVITY RULE (simple proposal; validate with the team):
+  //  - 0g: cephalic flow (arrow up, solid).
+  //  - 1g: distal flow (arrow down, solid).
+  //  - Moon (1/6g) and Mars (3/8g): gravity is still present, so the arrow points down as in 1g,
+  //    but dashed and weaker, proportional to gravity (Mars > Moon). It is only a visual
+  //    aid: it does not represent a measurement or a diagnosis.
   const GRAVITY_VIEW = {
-    '0G_ORBIT':  { text: '0 g · fluxo cefálico',          arrow: 'up',   strength: 1,    partial: false },
-    '1_6G_MOON': { text: '1/6 g · fluxo distal parcial',  arrow: 'down', strength: 0.45, partial: true },
-    '3_8G_MARS': { text: '3/8 g · fluxo distal parcial',  arrow: 'down', strength: 0.7,  partial: true },
-    '1G_EARTH':  { text: '1 g · fluxo distal',            arrow: 'down', strength: 1,    partial: false }
+    '0G_ORBIT':  { text: '0 g · cephalic flow',          arrow: 'up',   strength: 1,    partial: false },
+    '1_6G_MOON': { text: '1/6 g · partial distal flow',  arrow: 'down', strength: 0.45, partial: true },
+    '3_8G_MARS': { text: '3/8 g · partial distal flow',  arrow: 'down', strength: 0.7,  partial: true },
+    '1G_EARTH':  { text: '1 g · distal flow',            arrow: 'down', strength: 1,    partial: false }
   };
 
   function updateFlowDirection(gravityProfile) {
@@ -65,7 +65,7 @@
     if (label) label.textContent = view ? view.text : '';
   }
 
-  // Apenas velocidade visual: duração do ciclo = 60 / bpm (não classifica a FC).
+  // Visual speed only: cycle duration = 60 / bpm (does not classify the HR).
   function setHeartRate(heartRateBpm) {
     const heart = document.querySelector('#zone-thorax .heart-pulse');
     if (!heart) return;
@@ -79,11 +79,11 @@
     heart.classList.add('is-beating');
   }
 
-  // FC: 3º argumento opcional {heartRateBpm}; senão, o último payload enviado pelo app.js
-  // (window.HemoState.lastPayload.heartRateBpm — campo já existente no ReadingRequest).
+  // HR: optional 3rd argument {heartRateBpm}; otherwise, the latest payload sent by app.js
+  // (window.HemoState.lastPayload.heartRateBpm — field already present in ReadingRequest).
   function render(zonesData, gravityProfile, options) {
     if (!zonesData || typeof zonesData !== 'object') {
-      console.warn('BodyMap: dados de zonas ausentes ou inválidos.');
+      console.warn('BodyMap: zone data missing or invalid.');
       return;
     }
     Object.keys(ZONES).forEach((key) => paintZone(key, zonesData[key]));
@@ -104,7 +104,7 @@
 
   function selectFromMap(zoneKey) {
     if (typeof window.selectZone === 'function') window.selectZone(zoneKey);
-    else console.warn('BodyMap: window.selectZone ainda não está disponível.');
+    else console.warn('BodyMap: window.selectZone is not available yet.');
   }
 
   function bindZoneEvents() {
@@ -120,7 +120,7 @@
         }
       });
     });
-    // acessibilidade: reflete a zona selecionada (evento emitido pelo app.js)
+    // accessibility: reflects the selected zone (event emitted by app.js)
     document.addEventListener('hemospace:zone', (ev) => syncPressed(ev.detail && ev.detail.zoneKey));
   }
 

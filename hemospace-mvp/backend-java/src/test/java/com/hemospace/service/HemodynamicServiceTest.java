@@ -62,29 +62,29 @@ class HemodynamicServiceTest {
     }
 
  @Test
-    void novasRegras_itb_pp_cabeca_retornoCapilar() {
-        // ITB
+    void newRules_abi_pp_head_capillaryRefill() {
+        // ABI
         assertEquals("BLUE", s.classifyABI(0.90));
         assertEquals("GREEN", s.classifyABI(1.40));
         assertEquals("YELLOW", s.classifyABI(1.41));
-        // pressão de pulso proporcional
-        assertEquals("RED", s.classifyPulsePressure(35, 160));   // 21,9% da sistólica
+        // proportional pulse pressure
+        assertEquals("RED", s.classifyPulsePressure(35, 160));   // 21.9% of systolic
         assertEquals("GREEN", s.classifyPulsePressure(42, 118));
-        // cabeça: jugular pesa mais; ITB sozinho só amarelo; vermelho exige confirmação
+        // head: jugular weighs more; ABI alone only yellow; red requires confirmation
         assertEquals("YELLOW", zone(118, 76, 100, 1.5, "NORMAL", "head_neck"));
         assertEquals("YELLOW", zone(118, 76, 112, 1.5, "DILATED", "head_neck"));
         assertEquals("RED",    zone(118, 76, 100, 1.5, "DILATED", "head_neck"));
-        // retorno capilar lento: braços amarelo
+        // slow capillary refill: arms yellow
         assertEquals("GREEN",  zone(118, 76, 112, 2.0, "NORMAL", "upper_limbs"));
         assertEquals("YELLOW", zone(118, 76, 112, 2.5, "NORMAL", "upper_limbs"));
-        // ITB 0,90 exato -> pernas azuis
+        // ABI exactly 0.90 -> legs blue
         assertEquals("BLUE",   zone(120, 80, 108, 1.5, "NORMAL", "lower_limbs"));
     }
 
     @Test
-    void alertaOrtostatico_vemRotuladoComoDemonstracao() {
+    void orthostaticAlert_isLabeledAsDemo() {
         String label = s.applyDemoPreset("C").zones().get("thorax_heart").label();
-        assertTrue(label.contains("demonstração"));
+        assertTrue(label.contains("demo"));
     }
 
     private String zone(double sys, double dia, double ankle, double ppg, String us, String zoneKey) {

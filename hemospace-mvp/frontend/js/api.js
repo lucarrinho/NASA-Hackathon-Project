@@ -1,36 +1,36 @@
 /* ==========================================================================
-   HemoSpace v1.0 — api.js  [Dev 5 · Camada de API + fallback offline]
+   HemoSpace v1.0 — api.js  [Dev 5 · API layer + offline fallback]
 
-   Contrato público (README):
+   Public contract (README):
      ApiClient.postReading(payload)  -> Promise<AstronautStateResponse>
      ApiClient.loadPreset(code)      -> Promise<AstronautStateResponse>   (A | B | C)
      ApiClient.getState(id)          -> Promise<AstronautStateResponse>
      ApiClient.classifyUltrasound({astronautId, region, ultrasoundPreset})
-     ApiClient.computeLocal(payload) -> AstronautStateResponse (sempre com _offline: true)
-     ApiClient.selfTest()            -> confere Cenários A/B/C no motor local (console)
+     ApiClient.computeLocal(payload) -> AstronautStateResponse (always with _offline: true)
+     ApiClient.selfTest()            -> checks Scenarios A/B/C in the local engine (console)
 
-   Regra 2: se o Java não responder em 500 ms (ou cair), calcula localmente.
-   O LocalEngine abaixo replica HemodynamicService.java regra por regra.
-   >>> Se o Dev 2 mudar qualquer limiar/texto no Java, atualize LocalEngine junto. <<<
+   Rule 2: if Java does not respond within 500 ms (or goes down), compute locally.
+   The LocalEngine below replicates HemodynamicService.java rule by rule.
+   >>> If Dev 2 changes any threshold/text in Java, update LocalEngine as well. <<<
 
-   Adaptações entre o frontend e o record ReadingRequest (feitas só aqui):
+   Adaptations between the frontend and the ReadingRequest record (done only here):
    - ultrasoundPreset: 'jugular_normal' | 'jugular_dilated' | 'femoral_reduced' | 'NONE'
-       -> 'NORMAL' | 'DILATED' | 'REDUCED' (o Java rejeita os ids da Aba 3).
-   - calfCircumferenceCm: o formulário envia a VARIAÇÃO (ex.: -2.4); o Java exige valor
-       não negativo, então enviamos CALF_BASELINE_CM + variação.
+       -> 'NORMAL' | 'DILATED' | 'REDUCED' (Java rejects the Tab 3 ids).
+   - calfCircumferenceCm: the form sends the VARIATION (e.g., -2.4); Java requires a
+       non-negative value, so we send CALF_BASELINE_CM + variation.
    ========================================================================== */
 (function () {
   'use strict';
 
   const BASE_URL = 'http://localhost:8080/api/v1';
-  const TIMEOUT_MS = 500;         // Regra 2
-  const WARMUP_TIMEOUT_MS = 4000; // 1ª chamada ao Spring pode demorar (cold start)
-  const CALF_BASELINE_CM = 35.0;  // mesmo valor usado pelo Java nos presets
+  const TIMEOUT_MS = 500;         // Rule 2
+  const WARMUP_TIMEOUT_MS = 4000; // 1st call to Spring may be slow (cold start)
+  const CALF_BASELINE_CM = 35.0;  // same value used by Java in the presets
 
   const GRAVITY_PROFILES = ['0G_ORBIT', '1_6G_MOON', '3_8G_MARS', '1G_EARTH'];
   const MISSION_DAY = 42;
 
-  // Série de 7 dias (cópia de astronaut_history.json) para o gráfico funcionar offline.
+  // 7-day series (copy of astronaut_history.json) so the chart works offline.
   const LOCAL_HISTORY = [
     { mission_day: 36, map_mmhg: 95.0, abi_index: 0.96, heart_rate_bpm: 70 },
     { mission_day: 37, map_mmhg: 94.0, abi_index: 0.94, heart_rate_bpm: 72 },
@@ -41,7 +41,7 @@
     { mission_day: 42, map_mmhg: 88.0, abi_index: 0.82, heart_rate_bpm: 80 }
   ];
 
-  // ------------------------------------------------------------ adaptadores
+  // ------------------------------------------------------------ adapters
   const ULTRASOUND_TO_BACKEND = {
     jugular_normal: 'NORMAL',
     jugular_dilated: 'DILATED',
@@ -56,7 +56,7 @@
     return ULTRASOUND_TO_BACKEND[value] || 'NORMAL';
   }
 
-  /** Converte o payload do frontend para o record ReadingRequest do Java. */
+  /** Converts the frontend payload to Java's ReadingRequest record. */
   function toBackendPayload(p) {
     return {
       astronautId: p.astronautId,
@@ -71,35 +71,35 @@
     };
   }
 
-  /** Mesmas exigências do Java (validate). Erro aqui vira toast no app.js, sem cair no offline. */
+  /** Same requirements as Java (validate). An error here becomes a toast in app.js, without falling back to offline. */
   function validatePayload(p) {
     const fail = (msg) => { throw new Error(msg); };
-    if (!p || typeof p !== 'object') fail('Leitura ausente.');
-    if (!p.astronautId) fail('Tripulante não identificado.');
-    if (!GRAVITY_PROFILES.includes(p.gravityProfile)) fail('Ambiente gravitacional inválido.');
+    if (!p || typeof p !== 'object') fail('Reading missing.');
+    if (!p.astronautId) fail('Crew member not identified.');
+    if (!GRAVITY_PROFILES.includes(p.gravityProfile)) fail('Invalid gravitational environment.');
     ['armSystolicMmhg', 'armDiastolicMmhg', 'ankleSystolicMmhg'].forEach((k) => {
-      if (!Number.isFinite(p[k]) || p[k] <= 0) fail('As pressões devem ser números positivos.');
+      if (!Number.isFinite(p[k]) || p[k] <= 0) fail('Pressures must be positive numbers.');
     });
-    if (p.armSystolicMmhg <= p.armDiastolicMmhg) fail('A PAS do braço precisa ser maior que a PAD.');
-    if (!Number.isFinite(p.heartRateBpm) || p.heartRateBpm <= 0) fail('Informe uma FC válida.');
-    if (!Number.isFinite(p.calfCircumferenceCm)) fail('Informe a variação da panturrilha.');
+    if (p.armSystolicMmhg <= p.armDiastolicMmhg) fail('Arm SBP must be greater than DBP.');
+    if (!Number.isFinite(p.heartRateBpm) || p.heartRateBpm <= 0) fail('Enter a valid HR.');
+    if (!Number.isFinite(p.calfCircumferenceCm)) fail('Enter the calf variation.');
     if (!Number.isFinite(p.ppgCapillaryRefillSec) || p.ppgCapillaryRefillSec < 0) {
-      fail('Retorno capilar inválido.');
+      fail('Invalid capillary refill.');
     }
   }
 
   // ------------------------------------------------------------- LocalEngine
-  // Espelho exato de HemodynamicService.java (regras provisórias incluídas).
+  // Exact mirror of HemodynamicService.java (provisional rules included).
   const LocalEngine = (function () {
     const ORTHOSTATIC_HR_MIN_BPM = 95;
     const ORTHOSTATIC_PP_MAX_MMHG = 30;
 
-    // Limiares espelhados de HemodynamicService.java / clinical_rules.json
-    const ABI_BLUE_MAX = 0.9;          // ITB <= 0,90: anormal
-    const ABI_GREEN_MAX = 1.4;         // ITB > 1,40: não compressível (decisão: 1,40)
+    // Thresholds mirrored from HemodynamicService.java / clinical_rules.json
+    const ABI_BLUE_MAX = 0.9;          // ABI <= 0.90: abnormal
+    const ABI_GREEN_MAX = 1.4;         // ABI > 1.40: non-compressible (decision: 1.40)
     const PP_RED_BELOW_MMHG = 25;
     const PP_RED_BELOW_FRACTION = 0.25;
-    const CAPILLARY_REFILL_MAX_SEC = 2.0; // PROVISÓRIO
+    const CAPILLARY_REFILL_MAX_SEC = 2.0; // PROVISIONAL
 
     const round2 = (v) => Math.round(v * 100) / 100;
     const z = (status, label, action) => ({ status, label, action });
@@ -112,20 +112,20 @@
     const classifyABI = (a) => (a <= ABI_BLUE_MAX ? 'BLUE' : a <= ABI_GREEN_MAX ? 'GREEN' : 'YELLOW');
     const classifyPP = (pp, sys) => ((pp < PP_RED_BELOW_MMHG || (sys > 0 && pp / sys < PP_RED_BELOW_FRACTION)) ? 'RED' : pp <= 60 ? 'GREEN' : 'YELLOW');
 
-    // Ultrassom jugular = marcador principal; ITB baixo sozinho só rebaixa verde -> amarelo.
+    // Jugular ultrasound = main marker; low ABI alone only downgrades green -> yellow.
     function headNeck(abi, us) {
       const jugularDilated = us === 'DILATED';
       const lowAbi = classifyABI(abi) === 'BLUE';
       if (jugularDilated && lowAbi) {
-        return z('RED', 'Congestão Cefálica Severa (risco SANS)',
-          'Aplicar cintas de contenção nas coxas (Braslet), elevar tronco no repouso e realizar exame ocular.');
+        return z('RED', 'Severe Cephalic Congestion (SANS risk)',
+          'Apply thigh constriction cuffs (Braslet), elevate the torso at rest and perform an eye exam.');
       }
-      if (jugularDilated) return z('YELLOW', 'Congestão Cefálica Leve', 'Iniciar LBNP 20 min e monitorar visão.');
+      if (jugularDilated) return z('YELLOW', 'Mild Cephalic Congestion', 'Start 20 min LBNP and monitor vision.');
       if (lowAbi) {
-        return z('YELLOW', 'Perfusão Distal Reduzida (vigiar congestão cefálica)',
-          'Confirmar com ultrassom jugular e monitorar visão.');
+        return z('YELLOW', 'Reduced Distal Perfusion (watch for cephalic congestion)',
+          'Confirm with jugular ultrasound and monitor vision.');
       }
-      return z('GREEN', 'Sem Congestão Cefálica', 'Nenhuma intervenção necessária.');
+      return z('GREEN', 'No Cephalic Congestion', 'No intervention required.');
     }
 
     function orthostaticRisk(pp, p) {
@@ -136,51 +136,51 @@
     function thorax(map, pp, p) {
       const ppClass = classifyPP(pp, p.armSystolicMmhg);
       if (ppClass === 'RED') {
-        return z('RED', 'Pressão de Pulso Crítica (hipovolemia)',
-          'Protocolo urgente de reposição volêmica e suspensão de atividade extraveicular (EVA).');
+        return z('RED', 'Critical Pulse Pressure (hypovolemia)',
+          'Urgent fluid replacement protocol and suspension of extravehicular activity (EVA).');
       }
-      // HEURÍSTICA DE DEMONSTRAÇÃO (não é regra clínica validada)
+      // DEMO HEURISTIC (not a validated clinical rule)
       if (orthostaticRisk(pp, p)) {
-        return z('YELLOW', 'Risco de Intolerância Ortostática (alerta de demonstração)',
-          'Iniciar pré-hidratação e bloquear saída imediata do módulo.');
+        return z('YELLOW', 'Orthostatic Intolerance Risk (demo alert)',
+          'Start pre-hydration and block immediate exit from the module.');
       }
       const m = classifyMAP(map);
-      if (m === 'BLUE') return z('BLUE', 'PAM Baixa', 'Hidratação isotônica.');
-      if (m === 'YELLOW') return z('YELLOW', 'PAM Elevada', 'Repouso e redução de sódio.');
+      if (m === 'BLUE') return z('BLUE', 'Low MAP', 'Isotonic hydration.');
+      if (m === 'YELLOW') return z('YELLOW', 'High MAP', 'Rest and sodium reduction.');
       return ppClass === 'YELLOW'
-        ? z('YELLOW', 'Pressão de Pulso Elevada', 'Monitorar condição.')
-        : z('GREEN', 'Débito Cardíaco Estável', 'Manter rotina aeróbica padrão.');
+        ? z('YELLOW', 'High Pulse Pressure', 'Monitor condition.')
+        : z('GREEN', 'Stable Cardiac Output', 'Maintain standard aerobic routine.');
     }
 
-    // Retorno capilar só pode rebaixar verde -> amarelo; nunca gera vermelho.
+    // Capillary refill can only downgrade green -> yellow; never produces red.
     function upperLimbs(map, refillSec) {
       const m = classifyMAP(map);
-      if (m === 'BLUE') return z('BLUE', 'Pressão Sistêmica Baixa', 'Hidratação isotônica.');
-      if (m === 'YELLOW') return z('YELLOW', 'Pressão Sistêmica Elevada', 'Repouso e redução de sódio.');
+      if (m === 'BLUE') return z('BLUE', 'Low Systemic Pressure', 'Isotonic hydration.');
+      if (m === 'YELLOW') return z('YELLOW', 'High Systemic Pressure', 'Rest and sodium reduction.');
       if (refillSec > CAPILLARY_REFILL_MAX_SEC) {
-        return z('YELLOW', 'Perfusão Periférica Reduzida (retorno capilar lento)',
-          'Repetir a medição após repouso e reavaliar.');
+        return z('YELLOW', 'Reduced Peripheral Perfusion (slow capillary refill)',
+          'Repeat the measurement after rest and reassess.');
       }
-      return z('GREEN', 'Perfusão Sistêmica Normal', 'Nenhuma intervenção necessária.');
+      return z('GREEN', 'Normal Systemic Perfusion', 'No intervention required.');
     }
 
     function lowerLimbs(abi) {
       const a = classifyABI(abi);
-      if (a === 'BLUE') return z('BLUE', 'Déficit de Volume Distal', 'Executar protocolo de pré-hidratação.');
+      if (a === 'BLUE') return z('BLUE', 'Distal Volume Deficit', 'Run pre-hydration protocol.');
       if (a === 'YELLOW') {
-        return z('YELLOW', 'ITB Elevado',
-          'Ativar calça de pressão negativa (LBNP) e exercício resistido de membros inferiores.');
+        return z('YELLOW', 'High ABI',
+          'Activate negative-pressure trousers (LBNP) and lower-limb resistance exercise.');
       }
-      return z('GREEN', 'Perfusão Distal Normal', 'Nenhuma intervenção necessária.');
+      return z('GREEN', 'Normal Distal Perfusion', 'No intervention required.');
     }
 
-    /** payload no formato do frontend; ultrasoundPreset é normalizado aqui. */
+    /** payload in the frontend format; ultrasoundPreset is normalized here. */
     function evaluate(payload) {
       const p = Object.assign({}, payload, { ultrasoundPreset: toBackendPreset(payload.ultrasoundPreset) });
       const map = calculateMAP(p.armSystolicMmhg, p.armDiastolicMmhg);
       const abi = calculateABI(p.ankleSystolicMmhg, p.armSystolicMmhg);
       const pp = calculatePP(p.armSystolicMmhg, p.armDiastolicMmhg);
-      const abiR = round2(abi); // classifica com o valor mostrado na tela
+      const abiR = round2(abi); // classify with the value shown on screen
 
       return {
         astronaut_id: p.astronautId,
@@ -204,7 +204,7 @@
     return { evaluate };
   })();
 
-  // Presets A/B/C no formato do frontend (iguais aos do app.js e da spec §5).
+  // Presets A/B/C in the frontend format (same as app.js and spec §5).
   const LOCAL_PRESETS = {
     A: { gravityProfile: '0G_ORBIT',  armSystolicMmhg: 118, armDiastolicMmhg: 76, ankleSystolicMmhg: 112, heartRateBpm: 68, calfCircumferenceCm: 0.0,  ppgCapillaryRefillSec: 1.5, ultrasoundPreset: 'jugular_normal' },
     B: { gravityProfile: '0G_ORBIT',  armSystolicMmhg: 138, armDiastolicMmhg: 88, ankleSystolicMmhg: 108, heartRateBpm: 84, calfCircumferenceCm: 0.0,  ppgCapillaryRefillSec: 1.5, ultrasoundPreset: 'jugular_dilated' },
@@ -219,7 +219,7 @@
     return res;
   }
 
-  // ------------------------------------------------------------------- rede
+  // ------------------------------------------------------------------- network
   class HttpError extends Error {
     constructor(status, message) { super(message); this.status = status; }
   }
@@ -234,7 +234,7 @@
       }));
       if (!res.ok) {
         let msg = 'HTTP ' + res.status;
-        try { const body = await res.json(); if (body && body.message) msg = body.message; } catch (_) { /* sem corpo */ }
+        try { const body = await res.json(); if (body && body.message) msg = body.message; } catch (_) { /* no body */ }
         throw new HttpError(res.status, msg);
       }
       return await res.json();
@@ -248,9 +248,9 @@
     return err && err.message ? err.message : String(err);
   }
 
-  // -------------------------------------------------------------- API pública
+  // -------------------------------------------------------------- Public API
   async function postReading(payload) {
-    validatePayload(payload); // erro de digitação -> toast no app.js, não vira "offline"
+    validatePayload(payload); // typing error -> toast in app.js, does not become "offline"
     try {
       return await request('/readings', {
         method: 'POST',
@@ -258,9 +258,9 @@
       });
     } catch (err) {
       if (err instanceof HttpError && err.status >= 400 && err.status < 500) {
-        console.error('[api] o Java recusou a leitura (' + err.status + '): ' + err.message + ' — usando cálculo local.');
+        console.error('[api] Java rejected the reading (' + err.status + '): ' + err.message + ' — using local calculation.');
       } else {
-        console.warn('[api] Java indisponível, usando cálculo local:', describeFailure(err));
+        console.warn('[api] Java unavailable, using local calculation:', describeFailure(err));
       }
       return computeLocal(payload, describeFailure(err));
     }
@@ -269,11 +269,11 @@
   async function loadPreset(code) {
     const key = String(code || '').toUpperCase();
     const local = LOCAL_PRESETS[key];
-    if (!local) throw new Error('Cenário desconhecido: ' + code);
+    if (!local) throw new Error('Unknown scenario: ' + code);
     try {
       return await request('/demo/preset/' + encodeURIComponent(key), { method: 'POST' });
     } catch (err) {
-      console.warn('[api] preset via Java falhou, usando cálculo local:', describeFailure(err));
+      console.warn('[api] preset via Java failed, using local calculation:', describeFailure(err));
       return computeLocal(Object.assign({ astronautId: 'AST-04' }, local), describeFailure(err));
     }
   }
@@ -283,7 +283,7 @@
     try {
       return await request('/astronauts/' + encodeURIComponent(id) + '/state', { method: 'GET' });
     } catch (err) {
-      console.warn('[api] estado via Java falhou, usando valores do Cenário A:', describeFailure(err));
+      console.warn('[api] state via Java failed, using Scenario A values:', describeFailure(err));
       return computeLocal(Object.assign({ astronautId: id }, LOCAL_PRESETS.A), describeFailure(err));
     }
   }
@@ -291,17 +291,17 @@
   function classifyUltrasoundLocal(region, preset) {
     const key = region + ':' + preset;
     const table = {
-      'JUGULAR:NORMAL':  { region: 'head_neck',   status: 'GREEN',  label: 'Jugular normal',              action: 'Manter monitoramento' },
-      'JUGULAR:DILATED': { region: 'head_neck',   status: 'YELLOW', label: 'Alteração jugular detectada', action: 'Reavaliar congestão cefálica' },
-      'FEMORAL:NORMAL':  { region: 'lower_limbs', status: 'GREEN',  label: 'Fluxo femoral normal',        action: 'Manter monitoramento' },
-      'FEMORAL:REDUCED': { region: 'lower_limbs', status: 'BLUE',   label: 'Fluxo femoral reduzido',      action: 'Reavaliar perfusão distal' }
+      'JUGULAR:NORMAL':  { region: 'head_neck',   status: 'GREEN',  label: 'Normal jugular',              action: 'Maintain monitoring' },
+      'JUGULAR:DILATED': { region: 'head_neck',   status: 'YELLOW', label: 'Jugular change detected', action: 'Reassess cephalic congestion' },
+      'FEMORAL:NORMAL':  { region: 'lower_limbs', status: 'GREEN',  label: 'Normal femoral flow',        action: 'Maintain monitoring' },
+      'FEMORAL:REDUCED': { region: 'lower_limbs', status: 'BLUE',   label: 'Reduced femoral flow',      action: 'Reassess distal perfusion' }
     };
     const hit = table[key];
-    if (!hit) throw new Error('Combinação inválida de região/preset: ' + key);
+    if (!hit) throw new Error('Invalid region/preset combination: ' + key);
     return Object.assign({ classification: preset }, hit);
   }
 
-  /** Aceita presets da Aba 3 ('jugular_dilated') ou do Java ('DILATED'); deduz a região se faltar. */
+  /** Accepts Tab 3 presets ('jugular_dilated') or Java presets ('DILATED'); infers the region if missing. */
   async function classifyUltrasound(req) {
     const preset = toBackendPreset(req && req.ultrasoundPreset);
     const raw = String((req && req.ultrasoundPreset) || '').toLowerCase();
@@ -313,19 +313,19 @@
         body: JSON.stringify({ astronautId, region, ultrasoundPreset: preset })
       });
     } catch (err) {
-      console.warn('[api] classificação via Java falhou, usando regra local:', describeFailure(err));
+      console.warn('[api] classification via Java failed, using local rule:', describeFailure(err));
       return Object.assign(classifyUltrasoundLocal(region, preset), { _offline: true });
     }
   }
 
-  /** "Aquece" o Spring (cold start) para a 1ª leitura da demo não estourar os 500 ms. */
+  /** "Warms up" Spring (cold start) so the demo's 1st reading does not exceed 500 ms. */
   function warmup() {
     return request('/astronauts/AST-04/state', { method: 'GET' }, WARMUP_TIMEOUT_MS)
       .then(() => true)
       .catch(() => false);
   }
 
-  /** Console: ApiClient.selfTest() — confere A/B/C no motor local contra a spec e o HemodynamicServiceTest. */
+  /** Console: ApiClient.selfTest() — checks A/B/C in the local engine against the spec and HemodynamicServiceTest. */
   function selfTest() {
     const expected = {
       A: { map: 90.0,   abi: 0.95, head: 'GREEN', thorax: 'GREEN',  upper: 'GREEN',  lower: 'GREEN' },
@@ -342,11 +342,11 @@
       };
       const ok = Math.abs(got.map - e.map) < 0.01 && Math.abs(got.abi - e.abi) < 0.01 &&
         got.head === e.head && got.thorax === e.thorax && got.upper === e.upper && got.lower === e.lower;
-      return { cenario: code, ok, esperado: JSON.stringify(e), obtido: JSON.stringify(got) };
+      return { scenario: code, ok, expected: JSON.stringify(e), got: JSON.stringify(got) };
     });
     if (typeof console.table === 'function') console.table(rows);
     const allOk = rows.every((r) => r.ok);
-    console[allOk ? 'log' : 'error']('[api] selfTest ' + (allOk ? 'OK' : 'FALHOU'));
+    console[allOk ? 'log' : 'error']('[api] selfTest ' + (allOk ? 'OK' : 'FAILED'));
     return allOk;
   }
 

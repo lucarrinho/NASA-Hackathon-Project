@@ -5,8 +5,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * [Dev 1] Libera o frontend (file://, Live Server, localhost:*) a chamar a API.
- * Origem "*" é intencional: MVP de hackathon, sem cookies/credenciais.
+ * [Dev 1] Allows the frontend (file://, Live Server, localhost:*) to call the API.
+ * Origin "*" is intentional: hackathon MVP, no cookies/credentials.
  */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {

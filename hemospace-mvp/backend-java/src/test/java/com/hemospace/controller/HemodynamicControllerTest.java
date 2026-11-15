@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Testes de contrato HTTP (JSON snake_case na resposta, camelCase na entrada, códigos de erro). */
+/** HTTP contract tests (snake_case JSON in the response, camelCase on input, error codes). */
 @SpringBootTest
 @AutoConfigureMockMvc
 class HemodynamicControllerTest {
@@ -26,7 +26,7 @@ class HemodynamicControllerTest {
              "calfCircumferenceCm":35.0,"ppgCapillaryRefillSec":1.5,"ultrasoundPreset":"NORMAL"}""";
 
     @Test
-    void presetA_todasVerdes() throws Exception {
+    void presetA_allGreen() throws Exception {
         mvc.perform(post("/api/v1/demo/preset/A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.computed_metrics.map_mmhg").value(90.0))
@@ -38,7 +38,7 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void presetB_cabecaVermelha_pernasAzuis() throws Exception {
+    void presetB_headRed_legsBlue() throws Exception {
         mvc.perform(post("/api/v1/demo/preset/B"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.computed_metrics.abi_index").value(0.78))
@@ -47,7 +47,7 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void presetC_alertaOrtostatico_marte() throws Exception {
+    void presetC_orthostaticAlert_mars() throws Exception {
         mvc.perform(post("/api/v1/demo/preset/C"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gravity_profile").value("3_8G_MARS"))
@@ -56,7 +56,7 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void readings_validoRetornaQuatroZonasEHistoricoDeSeteDias() throws Exception {
+    void readings_validReturnsFourZonesAndSevenDayHistory() throws Exception {
         mvc.perform(post("/api/v1/readings").contentType(MediaType.APPLICATION_JSON).content(VALID_READING))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.astronaut_id").value("AST-04"))
@@ -65,8 +65,8 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void readings_presetDeUltrassomDaAba3EhRecusado() throws Exception {
-        // o api.js converte 'jugular_dilated' -> 'DILATED'; o Java deve recusar o id cru
+    void readings_tab3UltrasoundPresetIsRejected() throws Exception {
+        // api.js converts 'jugular_dilated' -> 'DILATED'; Java must reject the raw id
         mvc.perform(post("/api/v1/readings").contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_READING.replace("\"NORMAL\"", "\"jugular_dilated\"")))
                 .andExpect(status().isBadRequest())
@@ -74,21 +74,21 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void readings_sistolicaMenorQueDiastolicaEhRecusada() throws Exception {
+    void readings_systolicLowerThanDiastolicIsRejected() throws Exception {
         mvc.perform(post("/api/v1/readings").contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_READING.replace("\"armSystolicMmhg\":118", "\"armSystolicMmhg\":60")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void readings_jsonMalformadoRetorna400_nunca500() throws Exception {
-        mvc.perform(post("/api/v1/readings").contentType(MediaType.APPLICATION_JSON).content("{nao-eh-json"))
+    void readings_malformedJsonReturns400_never500() throws Exception {
+        mvc.perform(post("/api/v1/readings").contentType(MediaType.APPLICATION_JSON).content("{not-json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("INVALID_PAYLOAD"));
     }
 
     @Test
-    void ultrassom_jugularDilatadaAmarelo_femoralReduzidaAzul() throws Exception {
+    void ultrasound_dilatedJugularYellow_reducedFemoralBlue() throws Exception {
         mvc.perform(post("/api/v1/ultrasound/classify").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"astronautId\":\"AST-04\",\"region\":\"JUGULAR\",\"ultrasoundPreset\":\"DILATED\"}"))
                 .andExpect(status().isOk())
@@ -102,20 +102,20 @@ class HemodynamicControllerTest {
     }
 
     @Test
-    void ultrassom_combinacaoInvalidaRetorna400() throws Exception {
+    void ultrasound_invalidCombinationReturns400() throws Exception {
         mvc.perform(post("/api/v1/ultrasound/classify").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"astronautId\":\"AST-04\",\"region\":\"JUGULAR\",\"ultrasoundPreset\":\"REDUCED\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void recursosInexistentesRetornam404() throws Exception {
+    void nonexistentResourcesReturn404() throws Exception {
         mvc.perform(post("/api/v1/demo/preset/Z")).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/astronauts/AST-99/state")).andExpect(status().isNotFound());
     }
 
     @Test
-    void estadoInicialDoAstronauta() throws Exception {
+    void astronautInitialState() throws Exception {
         mvc.perform(get("/api/v1/astronauts/AST-04/state"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mission_day").value(42))

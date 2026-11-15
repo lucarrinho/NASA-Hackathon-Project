@@ -1,24 +1,24 @@
 /* ==========================================================================
-   HemoSpace v1.0 — app.js  [Dev 1 · Orquestrador]
+   HemoSpace v1.0 — app.js  [Dev 1 · Orchestrator]
 
-   Responsabilidades:
-   - Estado global (window.HemoState)
-   - Troca de ambiente gravitacional (0g / 1/6g / 3/8g / 1g)
-   - Botões de Cenário Demo A / B / C
-   - Troca de abas do módulo inferior
-   - Fluxo: coleta -> ApiClient.postReading(payload) (Dev 5)
+   Responsibilities:
+   - Global state (window.HemoState)
+   - Gravitational environment switching (0g / 1/6g / 3/8g / 1g)
+   - Demo Scenario A / B / C buttons
+   - Bottom module tab switching
+   - Flow: collection -> ApiClient.postReading(payload) (Dev 5)
             -> BodyMap.render(zones, gravity)       (Dev 3)
             -> ClinicalPanel.render(zone, data)     (Dev 4)
 
-   Contrato com os outros módulos: ver README.md na raiz do projeto.
+   Contract with the other modules: see README.md at the project root.
    ========================================================================== */
 (function () {
   'use strict';
 
-  // ------------------------------------------------------------------ constantes
+  // ------------------------------------------------------------------ constants
   const ZONE_KEYS = ['head_neck', 'thorax_heart', 'upper_limbs', 'lower_limbs'];
 
-  // ids dos grupos do SVG anatômico (Dev 3) para cada zona
+  // IDs of the anatomical SVG groups (Dev 3) for each zone
   const SVG_ZONE_IDS = {
     head_neck: 'zone-head',
     thorax_heart: 'zone-thorax',
@@ -26,37 +26,37 @@
     lower_limbs: 'zone-legs'
   };
 
-  // status do contrato JSON -> classe CSS
+  // JSON contract status -> CSS class
   const STATUS_CLASS = { BLUE: 'st-blue', GREEN: 'st-green', YELLOW: 'st-amber', RED: 'st-red' };
   const ALL_STATUS_CLASSES = Object.values(STATUS_CLASS);
 
   const GRAVITIES = ['0G_ORBIT', '1_6G_MOON', '3_8G_MARS', '1G_EARTH'];
 
-  // Se true e ApiClient.loadPreset existir, os botões A/B/C chamam
-  // POST /api/v1/demo/preset/{code}. Por padrão os valores da spec §5 são
-  // preenchidos no formulário e enviados via postReading (funciona offline).
+  // If true and ApiClient.loadPreset exists, the A/B/C buttons call
+  // POST /api/v1/demo/preset/{code}. By default the spec §5 values are
+  // filled into the form and sent via postReading (works offline).
   const USE_BACKEND_PRESETS = false;
 
-  // Cenários validados (spec §5). ultrasoundPreset usa os mesmos ids de data-sample da Aba 3.
+  // Validated scenarios (spec §5). ultrasoundPreset uses the same data-sample ids as Tab 3.
   const PRESETS = {
     A: { gravityProfile: '0G_ORBIT',  armSys: 118, armDia: 76, ankleSys: 112, hr: 68, calf: 0.0,  ultrasoundPreset: 'jugular_normal'  },
     B: { gravityProfile: '0G_ORBIT',  armSys: 138, armDia: 88, ankleSys: 108, hr: 84, calf: 0.0,  ultrasoundPreset: 'jugular_dilated' },
     C: { gravityProfile: '3_8G_MARS', armSys: 96,  armDia: 68, ankleSys: 84,  hr: 98, calf: -2.4, ultrasoundPreset: 'NONE'            }
   };
 
-  // ------------------------------------------------------------------ estado global
+  // ------------------------------------------------------------------ global state
   const S = (window.HemoState = {
     astronautId: 'AST-04',
     missionDay: 42,
     gravityProfile: '0G_ORBIT',
     selectedZone: 'head_neck',
-    data: null,                 // último AstronautStateResponse
-    lastPayload: null,          // último ReadingRequest enviado
+    data: null,                 // latest AstronautStateResponse
+    lastPayload: null,          // latest ReadingRequest sent
     activePreset: null,         // 'A' | 'B' | 'C' | null
     offline: false,
     busy: false,
-    // Preenchidos pelos módulos de captura (Dev 5 / Dev 6):
-    ppgCapillaryRefillSec: 1.5, // inputs.js atualiza após a leitura óptica
+    // Filled by the capture modules (Dev 5 / Dev 6):
+    ppgCapillaryRefillSec: 1.5, // inputs.js updates after the optical reading
     ultrasoundPreset: 'NONE'    // ultrasound.js: 'jugular_normal' | 'jugular_dilated' | 'femoral_reduced' | 'NONE'
   });
 
@@ -64,22 +64,22 @@
   let requestSeq = 0;
   const warned = {};
 
-  // ------------------------------------------------------------------ utilidades
-  /** Chama window[moduleName][method] sem derrubar o app se o módulo ainda não existir ou falhar. */
+  // ------------------------------------------------------------------ utilities
+  /** Calls window[moduleName][method] without crashing the app if the module does not exist yet or fails. */
   function callModule(moduleName, method, ...args) {
     const mod = window[moduleName];
     if (!mod || typeof mod[method] !== 'function') {
       const key = moduleName + '.' + method;
       if (!warned[key]) {
         warned[key] = true;
-        console.warn('[HemoSpace] ' + key + ' ainda não disponível (merge pendente).');
+        console.warn('[HemoSpace] ' + key + ' not available yet (merge pending).');
       }
       return;
     }
     try {
       mod[method](...args);
     } catch (err) {
-      console.error('[HemoSpace] erro em ' + moduleName + '.' + method, err);
+      console.error('[HemoSpace] error in ' + moduleName + '.' + method, err);
     }
   }
 
@@ -120,7 +120,7 @@
   function buildPayload() {
     const form = $('manual-reading-form');
     if (form && !form.checkValidity()) {
-      switchTab('tab-manual'); // o formulário precisa estar visível para mostrar o erro
+      switchTab('tab-manual'); // the form must be visible to show the error
       form.reportValidity();
       return null;
     }
@@ -139,25 +139,25 @@
 
     const invalid = Object.keys(payload).filter((k) => typeof payload[k] === 'number' && Number.isNaN(payload[k]));
     if (invalid.length) {
-      showToast('Preencha todos os campos numéricos da Aba 1.');
+      showToast('Fill in all numeric fields in Tab 1.');
       return null;
     }
     return payload;
   }
 
-  // ------------------------------------------------------------------ diagnóstico
+  // ------------------------------------------------------------------ diagnosis
   function setBusy(busy) {
     S.busy = busy;
     const btn = $('btn-update-diagnosis');
     if (!btn) return;
     if (!btn.dataset.label) btn.dataset.label = btn.textContent.trim();
     btn.disabled = busy;
-    btn.textContent = busy ? 'Atualizando…' : btn.dataset.label;
+    btn.textContent = busy ? 'Updating…' : btn.dataset.label;
   }
 
   /**
-   * Executa uma requisição de diagnóstico e distribui o resultado.
-   * Respostas obsoletas (cliques rápidos) são descartadas.
+   * Runs a diagnosis request and distributes the result.
+   * Stale responses (rapid clicks) are discarded.
    */
   async function requestDiagnosis(fetcher, payload) {
     const seq = ++requestSeq;
@@ -165,13 +165,13 @@
     try {
       const data = await fetcher();
       if (seq !== requestSeq) return;
-      if (!data || !data.zones) throw new Error('Resposta sem o objeto "zones".');
+      if (!data || !data.zones) throw new Error('Response without the "zones" object.');
       if (payload) S.lastPayload = payload;
       applyResponse(data);
     } catch (err) {
       if (seq !== requestSeq) return;
-      console.error('[HemoSpace] falha ao atualizar diagnóstico', err);
-      showToast('Falha ao atualizar o diagnóstico: ' + (err && err.message ? err.message : err));
+      console.error('[HemoSpace] failed to update diagnosis', err);
+      showToast('Failed to update the diagnosis: ' + (err && err.message ? err.message : err));
     } finally {
       if (seq === requestSeq) setBusy(false);
     }
@@ -181,13 +181,13 @@
     const payload = buildPayload();
     if (!payload) return Promise.resolve();
     if (!window.ApiClient || typeof window.ApiClient.postReading !== 'function') {
-      showToast('ApiClient.postReading não encontrado (js/api.js).');
+      showToast('ApiClient.postReading not found (js/api.js).');
       return Promise.resolve();
     }
     return requestDiagnosis(() => window.ApiClient.postReading(payload), payload);
   }
 
-  // ------------------------------------------------------------------ renderização
+  // ------------------------------------------------------------------ rendering
   function applyResponse(data) {
     S.data = data;
 
@@ -209,7 +209,7 @@
 
   function updateTopbar() {
     const info = $('astronaut-info');
-    if (info) info.textContent = 'Tripulante: ' + S.astronautId + ' (Dia ' + S.missionDay + ')';
+    if (info) info.textContent = 'Crew member: ' + S.astronautId + ' (Day ' + S.missionDay + ')';
   }
 
   function updateCards(zones) {
@@ -249,14 +249,14 @@
     }
     el.classList.toggle('offline', S.offline);
     el.classList.toggle('online', !S.offline);
-    el.textContent = S.offline ? 'Modo offline (cálculo local)' : 'API Java online';
+    el.textContent = S.offline ? 'Offline mode (local calculation)' : 'Java API online';
   }
 
-  // ------------------------------------------------------------------ zona selecionada
-  /** Chamada pelo bodymap.js (clique no SVG) e pelos cards do index.html. */
+  // ------------------------------------------------------------------ selected zone
+  /** Called by bodymap.js (SVG click) and by the index.html cards. */
   function selectZone(zoneKey) {
     if (!ZONE_KEYS.includes(zoneKey)) {
-      console.warn('[HemoSpace] zona desconhecida:', zoneKey);
+      console.warn('[HemoSpace] unknown zone:', zoneKey);
       return;
     }
     S.selectedZone = zoneKey;
@@ -265,7 +265,7 @@
     emit('hemospace:zone', { zoneKey });
   }
 
-  // ------------------------------------------------------------------ gravidade
+  // ------------------------------------------------------------------ gravity
   function syncGravityButtons() {
     document.querySelectorAll('.grav-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.gravity === S.gravityProfile);
@@ -285,7 +285,7 @@
     }
   }
 
-  // ------------------------------------------------------------------ cenários demo
+  // ------------------------------------------------------------------ demo scenarios
   function syncDemoButtons() {
     document.querySelectorAll('.demo-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.preset === S.activePreset);
@@ -308,7 +308,7 @@
     S.ultrasoundPreset = p.ultrasoundPreset;
 
     emit('hemospace:preset', { code, ultrasoundPreset: p.ultrasoundPreset });
-    switchTab('tab-manual'); // apresentador vê os números injetados
+    switchTab('tab-manual'); // presenter sees the injected numbers
 
     const payload = buildPayload();
     if (!payload) return Promise.resolve();
@@ -317,13 +317,13 @@
       return requestDiagnosis(() => window.ApiClient.loadPreset(code), payload);
     }
     if (!window.ApiClient || typeof window.ApiClient.postReading !== 'function') {
-      showToast('ApiClient.postReading não encontrado (js/api.js).');
+      showToast('ApiClient.postReading not found (js/api.js).');
       return Promise.resolve();
     }
     return requestDiagnosis(() => window.ApiClient.postReading(payload), payload);
   }
 
-  // ------------------------------------------------------------------ abas
+  // ------------------------------------------------------------------ tabs
   function switchTab(tabId) {
     const target = $(tabId);
     if (!target) return;
@@ -335,12 +335,12 @@
       el.hidden = !on;
       el.classList.toggle('active', on);
     });
-    emit('hemospace:tab', { tab: tabId }); // inputs.js pode ligar/desligar a webcam aqui
+    emit('hemospace:tab', { tab: tabId }); // inputs.js can turn the webcam on/off here
   }
 
-  // ------------------------------------------------------------------ inicialização
+  // ------------------------------------------------------------------ initialization
   function decorateCards() {
-    // acessibilidade por teclado nos cards (sem mexer no HTML compartilhado)
+    // keyboard accessibility on the cards (without touching the shared HTML)
     ZONE_KEYS.forEach((key) => {
       const card = $('card-' + key);
       if (!card) return;
@@ -378,7 +378,7 @@
     const form = $('manual-reading-form');
     if (form) {
       form.addEventListener('submit', (ev) => {
-        ev.preventDefault(); // Enter no formulário não recarrega a página
+        ev.preventDefault(); // Enter in the form does not reload the page
         S.activePreset = null;
         syncDemoButtons();
         runDiagnosis();
@@ -392,10 +392,10 @@
     syncGravityButtons();
     highlightSelected();
     updateTopbar();
-    runDiagnosis(); // estado inicial: valores padrão do formulário (= Cenário A)
+    runDiagnosis(); // initial state: form default values (= Scenario A)
   }
 
-  // API pública (globais exigidos pela spec + atalhos para depuração)
+  // Public API (globals required by the spec + debugging shortcuts)
   window.selectZone = selectZone;
   window.HemoApp = { runDiagnosis, applyPreset, setGravity, selectZone, switchTab, showToast, PRESETS };
 

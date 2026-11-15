@@ -1,21 +1,21 @@
 /* ==========================================================================
-   HemoSpace v1.0 — inputs.js  [Dev 5 · Captura biométrica]
+   HemoSpace v1.0 — inputs.js  [Dev 5 · Biometric capture]
 
-   Aba 1 (Medição Rápida): usa o formulário do index.html (#manual-reading-form).
-     - limites nativos (min/max) + regra PAD < PAS via setCustomValidity, para o
-       form.checkValidity() do app.js já bloquear leituras inválidas;
-     - Enter em qualquer campo envia (requestSubmit -> submit tratado pelo app.js).
+   Tab 1 (Quick Measurement): uses the index.html form (#manual-reading-form).
+     - native limits (min/max) + DBP < SBP rule via setCustomValidity, so that
+       app.js form.checkValidity() already blocks invalid readings;
+     - Enter in any field submits (requestSubmit -> submit handled by app.js).
 
-   Aba 2 (Scanner Óptico): #tab-optical.
-     - webcam PPG (getUserMedia): média do canal vermelho -> filtro -> picos -> bpm;
-     - onda de pulso em #ppg-canvas; FC detectada preenche #input-hr;
-     - cronômetro de retorno capilar -> window.HemoState.ppgCapillaryRefillSec;
-     - #btn-simulate-ppg gera um sinal sintético pelo MESMO pipeline (plano B do telão).
+   Tab 2 (Optical Scanner): #tab-optical.
+     - PPG webcam (getUserMedia): red channel average -> filter -> peaks -> bpm;
+     - pulse wave on #ppg-canvas; detected HR fills #input-hr;
+     - capillary refill timer -> window.HemoState.ppgCapillaryRefillSec;
+     - #btn-simulate-ppg generates a synthetic signal through the SAME pipeline (big-screen plan B).
 
-   Integração com o app.js (Dev 1), sem editar arquivos alheios:
-     - escuta 'hemospace:tab' para desligar a câmera ao sair da Aba 2;
-     - após uma leitura concluída chama window.HemoApp.runDiagnosis().
-   Simulação educacional: a medição por webcam não tem validade clínica.
+   Integration with app.js (Dev 1), without editing other people's files:
+     - listens to 'hemospace:tab' to turn the camera off when leaving Tab 2;
+     - after a completed reading calls window.HemoApp.runDiagnosis().
+   Educational simulation: webcam measurement has no clinical validity.
    ========================================================================== */
 (function () {
   'use strict';
@@ -30,7 +30,7 @@
   };
 
   const CAPILLARY_MAX_SEC = 10;
-  const SIM_CAPILLARY_SEC = 1.8; // valor plausível devolvido pela simulação
+  const SIM_CAPILLARY_SEC = 1.8; // plausible value returned by the simulation
 
   const PPG = {
     windowMs: 12000,
@@ -46,7 +46,7 @@
     simDurationMs: 9000
   };
 
-  // ------------------------------------------------------------------ estado
+  // ------------------------------------------------------------------ state
   const st = {
     mode: 'idle',          // 'idle' | 'camera' | 'sim'
     buf: [],               // { t, v }
@@ -105,7 +105,7 @@
     document.head.appendChild(style);
   }
 
-  // ------------------------------------------------------------- Aba 1: form
+  // ------------------------------------------------------------- Tab 1: form
   function setupForm() {
     const form = $('manual-reading-form');
     if (!form) return;
@@ -125,12 +125,12 @@
       const s = readNumber('input-arm-sys');
       const d = readNumber('input-arm-dia');
       const bad = Number.isFinite(s) && Number.isFinite(d) && d >= s;
-      dia.setCustomValidity(bad ? 'A PAD precisa ser menor que a PAS.' : '');
+      dia.setCustomValidity(bad ? 'DBP must be lower than SBP.' : '');
     }
     [sys, dia].forEach((el) => el && el.addEventListener('input', checkPressures));
     checkPressures();
 
-    // Formulário sem botão de envio: Enter não envia sozinho, então fazemos isso aqui.
+    // Form without a submit button: Enter does not submit by itself, so we do it here.
     form.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter' || ev.target.tagName !== 'INPUT') return;
       ev.preventDefault();
@@ -139,7 +139,7 @@
     });
   }
 
-  // ------------------------------------------------------ Aba 2: montagem DOM
+  // ------------------------------------------------------ Tab 2: DOM setup
   function button(id, label, onClick) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -165,30 +165,30 @@
     status.id = 'ppg-status';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    status.textContent = 'Câmera desligada. Use "Simular Leitura Óptica" se não houver câmera.';
+    status.textContent = 'Camera off. Use "Simulate Optical Reading" if no camera is available.';
 
     const bpm = document.createElement('div');
-    bpm.innerHTML = 'FC óptica: <span id="ppg-bpm">--</span> bpm';
+    bpm.innerHTML = 'Optical HR: <span id="ppg-bpm">--</span> bpm';
 
     const camRow = document.createElement('div');
     camRow.className = 'ppg-row';
-    st.el.camStart = button('btn-ppg-start', 'Ligar câmera', startCamera);
-    st.el.camStop = button('btn-ppg-stop', 'Parar câmera', stopCamera);
+    st.el.camStart = button('btn-ppg-start', 'Start camera', startCamera);
+    st.el.camStop = button('btn-ppg-stop', 'Stop camera', stopCamera);
     st.el.camStop.disabled = true;
     camRow.append(st.el.camStart, st.el.camStop);
 
     const capRow = document.createElement('div');
     capRow.className = 'ppg-row';
-    st.el.capStart = button('btn-cap-start', 'Soltar compressão', capStart);
-    st.el.capStop = button('btn-cap-stop', 'Cor voltou', capStop);
+    st.el.capStart = button('btn-cap-start', 'Release pressure', capStart);
+    st.el.capStop = button('btn-cap-stop', 'Color returned', capStop);
     st.el.capStop.disabled = true;
     capRow.append(st.el.capStart, st.el.capStop);
 
     const note = document.createElement('div');
     note.className = 'ppg-note';
-    note.textContent = 'Cubra a lente com a ponta do dedo. Simulação educacional, sem validade clínica.';
+    note.textContent = 'Cover the lens with your fingertip. Educational simulation, no clinical validity.';
 
-    // Ordem: status, bpm, câmera, capilar, (label e botão de simulação já existentes), nota.
+    // Order: status, bpm, camera, capillary, (existing label and simulation button), note.
     controls.prepend(status, bpm, camRow, capRow);
     controls.append(note);
 
@@ -204,8 +204,8 @@
     if (st.el.status) st.el.status.textContent = msg;
   }
 
-  // -------------------------------------------------------- processamento PPG
-  // Média móvel centrada em janela de tempo (usa timestamps reais, não assume fps).
+  // -------------------------------------------------------- PPG processing
+  // Moving average centered on a time window (uses real timestamps, does not assume fps).
   function movingAvg(ts, vs, win) {
     const out = new Array(vs.length);
     let lo = 0;
@@ -226,7 +226,7 @@
     const ts = b.map((p) => p.t);
     const raw = b.map((p) => p.v);
     const base = movingAvg(ts, raw, PPG.detrendMs);
-    // Mais sangue = menos luz vermelha refletida: inverte o sinal.
+    // More blood = less reflected red light: invert the signal.
     const detr = raw.map((v, i) => base[i] - v);
     const sig = movingAvg(ts, detr, PPG.smoothMs);
 
@@ -239,7 +239,7 @@
       if (sig[i] > thr && sig[i] >= sig[i - 1] && sig[i] > sig[i + 1]) {
         const last = peaks[peaks.length - 1];
         if (last !== undefined && ts[i] - ts[last] < PPG.minPeakGapMs) {
-          if (sig[i] > sig[last]) peaks[peaks.length - 1] = i; // mantém o maior
+          if (sig[i] > sig[last]) peaks[peaks.length - 1] = i; // keep the largest
         } else {
           peaks.push(i);
         }
@@ -313,14 +313,14 @@
       if (st.el.bpm) st.el.bpm.textContent = a.bpm;
       if (a.stable && st.mode === 'camera' && !st.applied) {
         st.applied = true;
-        applyReading(a.bpm, null, 'FC de ' + a.bpm + ' bpm medida pela câmera.');
+        applyReading(a.bpm, null, 'HR of ' + a.bpm + ' bpm measured by the camera.');
       }
     } else if (st.el.bpm) {
       st.el.bpm.textContent = '--';
     }
   }
 
-  /** Grava FC (e, se vier, retorno capilar) e pede um novo diagnóstico. */
+  /** Stores HR (and, if provided, capillary refill) and requests a new diagnosis. */
   function applyReading(bpm, capillarySec, message) {
     if (Number.isFinite(bpm) && bpm >= 30 && bpm <= 220) setInputValue('input-hr', Math.round(bpm));
     if (Number.isFinite(capillarySec)) setCapillary(capillarySec);
@@ -328,10 +328,10 @@
     requestDiagnosis();
   }
 
-  // ------------------------------------------------------------------ câmera
+  // ------------------------------------------------------------------ camera
   async function startCamera() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus('Câmera indisponível (abra por http://localhost). Use a simulação.');
+      setStatus('Camera unavailable (open via http://localhost). Use the simulation.');
       return;
     }
     stopSimulation();
@@ -347,15 +347,15 @@
       st.lastBpm = null;
       if (st.el.video) {
         st.el.video.srcObject = stream;
-        await st.el.video.play().catch(() => { /* autoplay já cobre */ });
+        await st.el.video.play().catch(() => { /* autoplay already covers it */ });
       }
       st.el.camStart.disabled = true;
       st.el.camStop.disabled = false;
-      setStatus('Cubra a lente com a ponta do dedo e fique parado.');
+      setStatus('Cover the lens with your fingertip and stay still.');
       st.raf = requestAnimationFrame(cameraLoop);
     } catch (err) {
-      console.warn('[inputs] câmera negada ou ausente:', err);
-      setStatus('Sem acesso à câmera. Use "Simular Leitura Óptica" ou a Aba 1.');
+      console.warn('[inputs] camera denied or missing:', err);
+      setStatus('No camera access. Use "Simulate Optical Reading" or Tab 1.');
     }
   }
 
@@ -380,11 +380,11 @@
       const finger = r > 60 && r > g * 1.4 && r > b * 1.4;
       if (finger) {
         pushSample(performance.now(), r);
-        if (!st.applied) setStatus('Dedo detectado. Medindo…');
+        if (!st.applied) setStatus('Finger detected. Measuring…');
       } else {
         st.buf = [];
         st.applied = false;
-        setStatus('Cubra a lente com a ponta do dedo.');
+        setStatus('Cover the lens with your fingertip.');
       }
       refreshUi(false);
     }
@@ -403,8 +403,8 @@
     if (st.el.camStop) st.el.camStop.disabled = true;
   }
 
-  // -------------------------------------------------------------- simulação
-  // Sinal sintético alimentando o MESMO pipeline da câmera.
+  // -------------------------------------------------------------- simulation
+  // Synthetic signal feeding the SAME pipeline as the camera.
   function simulate() {
     stopCamera();
     stopSimulation();
@@ -413,9 +413,9 @@
     st.mode = 'sim';
     st.buf = [];
     st.lastBpm = null;
-    st.applied = true; // só a simulação decide quando aplicar
+    st.applied = true; // only the simulation decides when to apply
     if (st.el.sim) st.el.sim.disabled = true;
-    setStatus('Simulando leitura óptica…');
+    setStatus('Simulating optical reading…');
 
     const t0 = performance.now();
     let prev = t0;
@@ -424,7 +424,7 @@
       const t = performance.now();
       const dt = (t - prev) / 1000;
       prev = t;
-      const hrNow = target * (1 + 0.02 * Math.sin((t - t0) / 1800)); // leve variabilidade
+      const hrNow = target * (1 + 0.02 * Math.sin((t - t0) / 1800)); // slight variability
       phase = (phase + (dt * hrNow) / 60) % 1;
       const pulse = Math.exp(-(((phase - 0.2) / 0.1) ** 2)) +
                     0.3 * Math.exp(-(((phase - 0.5) / 0.1) ** 2));
@@ -437,11 +437,11 @@
         refreshUi(true);
         const detected = st.lastBpm;
         stopSimulation();
-        // Aplica a FC simulada (verdade do gerador) para o cenário ativo não mudar de classe
-        // por 1-2 bpm de erro de detecção; mostra a detectada para transparência.
+        // Applies the simulated HR (generator ground truth) so the active scenario does not change class
+        // because of 1-2 bpm of detection error; shows the detected one for transparency.
         applyReading(Math.round(target), SIM_CAPILLARY_SEC,
-          'Simulação concluída: FC ' + Math.round(target) + ' bpm' +
-          (detected ? ' (detectada: ' + detected + ')' : '') + ', retorno capilar ' +
+          'Simulation complete: HR ' + Math.round(target) + ' bpm' +
+          (detected ? ' (detected: ' + detected + ')' : '') + ', capillary refill ' +
           SIM_CAPILLARY_SEC.toFixed(1) + ' s.');
       }
     }, PPG.sampleEveryMs);
@@ -453,7 +453,7 @@
     if (st.el.sim) st.el.sim.disabled = false;
   }
 
-  // -------------------------------------------------------- retorno capilar
+  // -------------------------------------------------------- capillary refill
   function currentCapillary() {
     const s = hs();
     const v = s ? Number(s.ppgCapillaryRefillSec) : NaN;
@@ -461,13 +461,13 @@
   }
 
   function renderCapillary(sec) {
-    if (st.el.capLabel) st.el.capLabel.textContent = 'Retorno Capilar: ' + sec.toFixed(1) + 's';
+    if (st.el.capLabel) st.el.capLabel.textContent = 'Capillary Refill: ' + sec.toFixed(1) + 's';
   }
 
   function setCapillary(sec) {
     const v = Math.round(clamp(sec, 0, CAPILLARY_MAX_SEC) * 10) / 10;
     const s = hs();
-    if (s) s.ppgCapillaryRefillSec = v; // escrita permitida ao Dev 5 (README)
+    if (s) s.ppgCapillaryRefillSec = v; // write permitted to Dev 5 (README)
     renderCapillary(v);
   }
 
@@ -480,7 +480,7 @@
     st.cap.timer = setInterval(() => {
       renderCapillary(clamp((performance.now() - st.cap.t0) / 1000, 0, CAPILLARY_MAX_SEC));
     }, 100);
-    setStatus('Contando… clique em "Cor voltou" quando a pele recuperar a cor.');
+    setStatus('Counting… click "Color returned" when the skin regains its color.');
   }
 
   function capStop() {
@@ -491,8 +491,8 @@
     st.el.capStop.disabled = true;
     const sec = clamp((performance.now() - st.cap.t0) / 1000, 0, CAPILLARY_MAX_SEC);
     setCapillary(sec);
-    applyReading(NaN, null, 'Retorno capilar registrado: ' + currentCapillary().toFixed(1) + ' s' +
-      (currentCapillary() > 2 ? ' (acima de 2 s).' : '.'));
+    applyReading(NaN, null, 'Capillary refill recorded: ' + currentCapillary().toFixed(1) + ' s' +
+      (currentCapillary() > 2 ? ' (above 2 s).' : '.'));
   }
 
   // ------------------------------------------------------------------- init
@@ -501,7 +501,7 @@
     setupForm();
     setupOptical();
 
-    // Ao sair da Aba 2 a câmera e a simulação param (privacidade e bateria).
+    // When leaving Tab 2 the camera and simulation stop (privacy and battery).
     document.addEventListener('hemospace:tab', (ev) => {
       if (!ev.detail || ev.detail.tab !== 'tab-optical') {
         stopCamera();

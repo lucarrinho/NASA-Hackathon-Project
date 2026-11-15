@@ -25,22 +25,22 @@ public class HemodynamicService {
     public static final Set<String> ULTRASOUND_PRESETS =
             Set.of("NORMAL", "DILATED", "REDUCED");
 
-    // ===== REGRAS PROVISÓRIAS (NÃO DEFINIDAS NA ESPECIFICAÇÃO) =====
-    // Precisam ser aprovadas pela liderança técnica e movidas p/ clinical_rules.json.
-    /** Cenário C: alerta ortostático = perfil MARS/EARTH + FC >= X + PP < Y. */
+    // ===== PROVISIONAL RULES (NOT DEFINED IN THE SPECIFICATION) =====
+    // Must be approved by technical leadership and moved to clinical_rules.json.
+    /** Scenario C: orthostatic alert = MARS/EARTH profile + HR >= X + PP < Y. */
     static final int ORTHOSTATIC_HR_MIN_BPM = 95;
     static final double ORTHOSTATIC_PP_MAX_MMHG = 30;
     // ================================================================
 
-        // ===== LIMIARES (espelhados em clinical_rules.json) =====
-    /** ITB <= 0,90: anormal (AHA/ACC). */
+        // ===== THRESHOLDS (mirrored in clinical_rules.json) =====
+    /** ABI <= 0.90: abnormal (AHA/ACC). */
     static final double ABI_BLUE_MAX_INCLUSIVE = 0.90;
-    /** ITB > 1,40: artérias não compressíveis (AHA/ACC). Decisão da equipe: 1,40 (e não 1,30). */
+    /** ABI > 1.40: non-compressible arteries (AHA/ACC). Team decision: 1.40 (not 1.30). */
     static final double ABI_GREEN_MAX_INCLUSIVE = 1.40;
-    /** Pressão de pulso: vermelho se < 25 mmHg OU < 25% da sistólica ("estreita"). */
+    /** Pulse pressure: red if < 25 mmHg OR < 25% of systolic ("narrow"). */
     static final double PP_RED_BELOW_MMHG = 25;
     static final double PP_RED_BELOW_FRACTION = 0.25;
-    /** PROVISÓRIO: retorno capilar lento (s). Confirmar com revisor de saúde. */
+    /** PROVISIONAL: slow capillary refill (s). Confirm with health reviewer. */
     static final double CAPILLARY_REFILL_MAX_SEC = 2.0;
 
     private record History(int missionDay, List<HistoryPoint> points) {}
@@ -60,18 +60,18 @@ public class HemodynamicService {
             histories.put(root.get("astronaut_id").asText(),
                     new History(root.get("mission_day").asInt(), points));
         } catch (IOException e) {
-            throw new IllegalStateException("Falha ao carregar astronaut_history.json", e);
+            throw new IllegalStateException("Failed to load astronaut_history.json", e);
         }
     }
 
-    // ---------------------------------------------------------------- cálculos
+    // ---------------------------------------------------------------- calculations
 
     public double calculateMAP(double systolic, double diastolic) {
         return (systolic + 2 * diastolic) / 3.0;
     }
 
     public double calculateABI(double ankle, double arm) {
-        if (arm <= 0) throw new IllegalArgumentException("Pressão do braço deve ser maior que zero.");
+        if (arm <= 0) throw new IllegalArgumentException("Arm pressure must be greater than zero.");
         return ankle / arm;
     }
 
@@ -82,7 +82,7 @@ public class HemodynamicService {
     public String classifyMAP(double map) {
         if (map < 70) return "BLUE";
         if (map <= 100) return "GREEN";
-        return "YELLOW"; // TODO: regra YELLOW x RED acima de 100 ainda não definida
+        return "YELLOW"; // TODO: YELLOW vs RED rule above 100 not yet defined
     }
 
     public String classifyABI(double abi) {
@@ -97,14 +97,14 @@ public class HemodynamicService {
         return "YELLOW";
     }
 
-    /** Absoluta OU proporcional (PP < 25% da sistólica). */
+    /** Absolute OR proportional (PP < 25% of systolic). */
     public String classifyPulsePressure(double pp, double systolic) {
         if (pp < PP_RED_BELOW_MMHG || (systolic > 0 && pp / systolic < PP_RED_BELOW_FRACTION)) return "RED";
         if (pp <= 60) return "GREEN";
         return "YELLOW";
     }
 
-    // ------------------------------------------------------------- orquestração
+    // ------------------------------------------------------------- orchestration
 
     public AstronautStateResponse getState(String astronautId) {
         History h = requireHistory(astronautId);
@@ -123,15 +123,15 @@ public class HemodynamicService {
         ReadingRequest req = switch (code == null ? "" : code.toUpperCase()) {
             case "A" -> new ReadingRequest("AST-04", "0G_ORBIT", 118, 76, 112, 68, 35.0, 2.0, "NORMAL");
             case "B" -> new ReadingRequest("AST-04", "0G_ORBIT", 138, 88, 108, 84, 35.0, 2.0, "DILATED");
-            // C: variação de panturrilha (-2,4 cm) não cabe em calfCircumferenceCm; valor abaixo é placeholder
+            // C: calf variation (-2.4 cm) does not fit in calfCircumferenceCm; value below is a placeholder
             case "C" -> new ReadingRequest("AST-04", "3_8G_MARS", 96, 68, 84, 98, 35.0, 2.0, "NORMAL");
-            default -> throw new ResourceNotFoundException("Preset inexistente: " + code);
+            default -> throw new ResourceNotFoundException("Nonexistent preset: " + code);
         };
         return processReading(req);
     }
 
     private ReadingRequest defaultReading(String id) {
-        // Estado inicial (antes de qualquer leitura): ITB 0,82 conforme exemplo da especificação
+        // Initial state (before any reading): ABI 0.82 per the specification example
         return new ReadingRequest(id, "0G_ORBIT", 120, 80, 98.4, 74, 35.0, 2.0, "NORMAL");
     }
 
@@ -140,7 +140,7 @@ public class HemodynamicService {
         double abi = calculateABI(req.ankleSystolicMmhg(), req.armSystolicMmhg());
         double pp = calculatePulsePressure(req.armSystolicMmhg(), req.armDiastolicMmhg());
 
-        double abiR = round2(abi); // classifica com o mesmo valor mostrado na tela (ex.: 0,90 -> azul)
+        double abiR = round2(abi); // classify using the same value shown on screen (e.g., 0.90 -> blue)
         Map<String, ZoneStatusDTO> zones = new LinkedHashMap<>();
         zones.put("head_neck", headNeck(abiR, req.ultrasoundPreset()));
         zones.put("thorax_heart", thorax(map, pp, req));
@@ -153,42 +153,42 @@ public class HemodynamicService {
                 zones, h.points());
     }
 
-    // ------------------------------------------------------------------ zonas
+    // ------------------------------------------------------------------ zones
 
     /**
-     * Ultrassom jugular é o marcador principal. ITB baixo sozinho só rebaixa verde -> amarelo.
-     * Vermelho = jugular dilatada CONFIRMADA por ITB <= 0,90 (mantém o Cenário B da especificação).
+     * Jugular ultrasound is the main marker. Low ABI alone only downgrades green -> yellow.
+     * Red = dilated jugular CONFIRMED by ABI <= 0.90 (keeps Scenario B from the specification).
      */
     private ZoneStatusDTO headNeck(double abi, String ultrasound) {
         boolean jugularDilated = "DILATED".equals(ultrasound);
         boolean lowAbi = classifyABI(abi).equals("BLUE");
         if (jugularDilated && lowAbi)
-            return new ZoneStatusDTO("RED", "Congestão Cefálica Severa (risco SANS)",
-                    "Aplicar cintas de contenção nas coxas (Braslet), elevar tronco no repouso e realizar exame ocular.");
+            return new ZoneStatusDTO("RED", "Severe Cephalic Congestion (SANS risk)",
+                    "Apply thigh constriction cuffs (Braslet), elevate the torso at rest and perform an eye exam.");
         if (jugularDilated)
-            return new ZoneStatusDTO("YELLOW", "Congestão Cefálica Leve",
-                    "Iniciar LBNP 20 min e monitorar visão.");
+            return new ZoneStatusDTO("YELLOW", "Mild Cephalic Congestion",
+                    "Start 20 min LBNP and monitor vision.");
         if (lowAbi)
-            return new ZoneStatusDTO("YELLOW", "Perfusão Distal Reduzida (vigiar congestão cefálica)",
-                    "Confirmar com ultrassom jugular e monitorar visão.");
-        return new ZoneStatusDTO("GREEN", "Sem Congestão Cefálica", "Nenhuma intervenção necessária.");
+            return new ZoneStatusDTO("YELLOW", "Reduced Distal Perfusion (watch for cephalic congestion)",
+                    "Confirm with jugular ultrasound and monitor vision.");
+        return new ZoneStatusDTO("GREEN", "No Cephalic Congestion", "No intervention required.");
     }
 
     private ZoneStatusDTO thorax(double map, double pp, ReadingRequest req) {
         String ppClass = classifyPulsePressure(pp, req.armSystolicMmhg());
         if (ppClass.equals("RED"))
-            return new ZoneStatusDTO("RED", "Pressão de Pulso Crítica (hipovolemia)",
-                    "Protocolo urgente de reposição volêmica e suspensão de atividade extraveicular (EVA).");
-        // HEURÍSTICA DE DEMONSTRAÇÃO (não é regra clínica validada): ver orthostaticRisk()
+            return new ZoneStatusDTO("RED", "Critical Pulse Pressure (hypovolemia)",
+                    "Urgent fluid replacement protocol and suspension of extravehicular activity (EVA).");
+        // DEMO HEURISTIC (not a validated clinical rule): see orthostaticRisk()
         if (orthostaticRisk(pp, req))
-            return new ZoneStatusDTO("YELLOW", "Risco de Intolerância Ortostática (alerta de demonstração)",
-                    "Iniciar pré-hidratação e bloquear saída imediata do módulo.");
+            return new ZoneStatusDTO("YELLOW", "Orthostatic Intolerance Risk (demo alert)",
+                    "Start pre-hydration and block immediate exit from the module.");
         return switch (classifyMAP(map)) {
-            case "BLUE" -> new ZoneStatusDTO("BLUE", "PAM Baixa", "Hidratação isotônica.");
-            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "PAM Elevada", "Repouso e redução de sódio.");
+            case "BLUE" -> new ZoneStatusDTO("BLUE", "Low MAP", "Isotonic hydration.");
+            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "High MAP", "Rest and sodium reduction.");
             default -> ppClass.equals("YELLOW")
-                    ? new ZoneStatusDTO("YELLOW", "Pressão de Pulso Elevada", "Monitorar condição.")
-                    : new ZoneStatusDTO("GREEN", "Débito Cardíaco Estável", "Manter rotina aeróbica padrão.");
+                    ? new ZoneStatusDTO("YELLOW", "High Pulse Pressure", "Monitor condition.")
+                    : new ZoneStatusDTO("GREEN", "Stable Cardiac Output", "Maintain standard aerobic routine.");
         };
     }
 
@@ -197,72 +197,72 @@ public class HemodynamicService {
         return transition && req.heartRateBpm() >= ORTHOSTATIC_HR_MIN_BPM && pp < ORTHOSTATIC_PP_MAX_MMHG;
     }
 
-    /** Retorno capilar (PPG do dedo) só pode rebaixar verde -> amarelo; nunca gera vermelho. */
+    /** Capillary refill (finger PPG) can only downgrade green -> yellow; never produces red. */
     private ZoneStatusDTO upperLimbs(double map, double refillSec) {
         ZoneStatusDTO base = switch (classifyMAP(map)) {
-            case "BLUE" -> new ZoneStatusDTO("BLUE", "Pressão Sistêmica Baixa", "Hidratação isotônica.");
-            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "Pressão Sistêmica Elevada", "Repouso e redução de sódio.");
-            default -> new ZoneStatusDTO("GREEN", "Perfusão Sistêmica Normal", "Nenhuma intervenção necessária.");
+            case "BLUE" -> new ZoneStatusDTO("BLUE", "Low Systemic Pressure", "Isotonic hydration.");
+            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "High Systemic Pressure", "Rest and sodium reduction.");
+            default -> new ZoneStatusDTO("GREEN", "Normal Systemic Perfusion", "No intervention required.");
         };
         if (base.status().equals("GREEN") && refillSec > CAPILLARY_REFILL_MAX_SEC)
-            return new ZoneStatusDTO("YELLOW", "Perfusão Periférica Reduzida (retorno capilar lento)",
-                    "Repetir a medição após repouso e reavaliar.");
+            return new ZoneStatusDTO("YELLOW", "Reduced Peripheral Perfusion (slow capillary refill)",
+                    "Repeat the measurement after rest and reassess.");
         return base;
     }
 
     private ZoneStatusDTO lowerLimbs(double abi) {
         return switch (classifyABI(abi)) {
-            case "BLUE" -> new ZoneStatusDTO("BLUE", "Déficit de Volume Distal",
-                    "Executar protocolo de pré-hidratação.");
-            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "ITB Elevado",
-                    "Ativar calça de pressão negativa (LBNP) e exercício resistido de membros inferiores.");
-            default -> new ZoneStatusDTO("GREEN", "Perfusão Distal Normal", "Nenhuma intervenção necessária.");
+            case "BLUE" -> new ZoneStatusDTO("BLUE", "Distal Volume Deficit",
+                    "Run pre-hydration protocol.");
+            case "YELLOW" -> new ZoneStatusDTO("YELLOW", "High ABI",
+                    "Activate negative-pressure trousers (LBNP) and lower-limb resistance exercise.");
+            default -> new ZoneStatusDTO("GREEN", "Normal Distal Perfusion", "No intervention required.");
         };
     }
 
-    // --------------------------------------------------------------- ultrassom
+    // --------------------------------------------------------------- ultrasound
 
     public UltrasoundResponse classifyUltrasound(UltrasoundRequest req) {
         if (req.astronautId() == null || req.astronautId().isBlank())
-            throw new IllegalArgumentException("astronautId é obrigatório.");
+            throw new IllegalArgumentException("astronautId is required.");
         requireHistory(req.astronautId());
         String region = req.region() == null ? "" : req.region().toUpperCase();
         String preset = req.ultrasoundPreset() == null ? "" : req.ultrasoundPreset().toUpperCase();
         if (!ULTRASOUND_PRESETS.contains(preset))
-            throw new IllegalArgumentException("Preset de ultrassom desconhecido: " + req.ultrasoundPreset());
+            throw new IllegalArgumentException("Unknown ultrasound preset: " + req.ultrasoundPreset());
 
         return switch (region + ":" + preset) {
             case "JUGULAR:NORMAL" -> new UltrasoundResponse("head_neck", preset, "GREEN",
-                    "Jugular normal", "Manter monitoramento");
+                    "Normal jugular", "Maintain monitoring");
             case "JUGULAR:DILATED" -> new UltrasoundResponse("head_neck", preset, "YELLOW",
-                    "Alteração jugular detectada", "Reavaliar congestão cefálica");
+                    "Jugular change detected", "Reassess cephalic congestion");
             case "FEMORAL:NORMAL" -> new UltrasoundResponse("lower_limbs", preset, "GREEN",
-                    "Fluxo femoral normal", "Manter monitoramento");
+                    "Normal femoral flow", "Maintain monitoring");
             case "FEMORAL:REDUCED" -> new UltrasoundResponse("lower_limbs", preset, "BLUE",
-                    "Fluxo femoral reduzido", "Reavaliar perfusão distal");
+                    "Reduced femoral flow", "Reassess distal perfusion");
             default -> throw new IllegalArgumentException(
-                    "Combinação inválida de região/preset: " + region + "/" + preset);
+                    "Invalid region/preset combination: " + region + "/" + preset);
         };
     }
 
-    // -------------------------------------------------------------- validação
+    // -------------------------------------------------------------- validation
 
     void validate(ReadingRequest r) {
-        if (r == null) throw new IllegalArgumentException("Corpo da requisição ausente.");
+        if (r == null) throw new IllegalArgumentException("Request body missing.");
         if (r.astronautId() == null || r.astronautId().isBlank())
-            throw new IllegalArgumentException("astronautId é obrigatório.");
+            throw new IllegalArgumentException("astronautId is required.");
         if (r.gravityProfile() == null || !GRAVITY_PROFILES.contains(r.gravityProfile()))
-            throw new IllegalArgumentException("gravityProfile inválido.");
+            throw new IllegalArgumentException("Invalid gravityProfile.");
         if (!positive(r.armSystolicMmhg()) || !positive(r.ankleSystolicMmhg()) || !positive(r.armDiastolicMmhg()))
-            throw new IllegalArgumentException("Pressões devem ser positivas e finitas.");
+            throw new IllegalArgumentException("Pressures must be positive and finite.");
         if (r.armSystolicMmhg() <= r.armDiastolicMmhg())
-            throw new IllegalArgumentException("Pressão sistólica deve ser maior que pressão diastólica.");
+            throw new IllegalArgumentException("Systolic pressure must be greater than diastolic pressure.");
         if (r.heartRateBpm() <= 0)
-            throw new IllegalArgumentException("Frequência cardíaca deve ser positiva.");
+            throw new IllegalArgumentException("Heart rate must be positive.");
         if (!nonNegative(r.calfCircumferenceCm()) || !nonNegative(r.ppgCapillaryRefillSec()))
-            throw new IllegalArgumentException("Circunferência e PPG devem ser não negativos e finitos.");
+            throw new IllegalArgumentException("Circumference and PPG must be non-negative and finite.");
         if (r.ultrasoundPreset() == null || !ULTRASOUND_PRESETS.contains(r.ultrasoundPreset()))
-            throw new IllegalArgumentException("ultrasoundPreset desconhecido.");
+            throw new IllegalArgumentException("Unknown ultrasoundPreset.");
     }
 
     private boolean positive(double v) { return Double.isFinite(v) && v > 0; }
@@ -270,7 +270,7 @@ public class HemodynamicService {
 
     private History requireHistory(String id) {
         History h = id == null ? null : histories.get(id);
-        if (h == null) throw new ResourceNotFoundException("Astronauta não encontrado: " + id);
+        if (h == null) throw new ResourceNotFoundException("Astronaut not found: " + id);
         return h;
     }
 

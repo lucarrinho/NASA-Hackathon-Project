@@ -1,14 +1,14 @@
 /* ==========================================================================
    HemoSpace v1.0 — styles.css  [Dev 1]
-   Tela única, alta legibilidade (projeção em telão), paleta de 4 cores.
+   Single screen, high legibility (big-screen projection), 4-color palette.
    ========================================================================== */
 
 :root {
-  /* Paleta oficial de status (spec §4.2) */
-  --blue: #2563EB;   /* hipoperfusão / déficit de volume */
-  --green: #16A34A;  /* equilíbrio hemodinâmico */
-  --amber: #D97706;  /* alerta moderado / adaptação em curso */
-  --red: #DC2626;    /* risco crítico / notificar médicos de voo */
+  /* Official status palette (spec §4.2) */
+  --blue: #2563EB;   /* hypoperfusion / volume deficit */
+  --green: #16A34A;  /* hemodynamic balance */
+  --amber: #D97706;  /* moderate alert / adaptation in progress */
+  --red: #DC2626;    /* critical risk / notify flight surgeons */
 
   --bg: #0b1220;
   --panel: #111a2e;
@@ -19,7 +19,7 @@
   --accent: #38bdf8;
 }
 
-/* ---------- Classes de status (usadas por cards, badges e SVG) ---------- */
+/* ---------- Status classes (used by cards, badges and SVG) ---------- */
 .st-blue  { --st: #2563EB; --st-rgb: 37, 99, 235; }
 .st-green { --st: #16A34A; --st-rgb: 22, 163, 74; }
 .st-amber { --st: #D97706; --st-rgb: 217, 119, 6; }
@@ -96,7 +96,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .conn-status.online  { background: rgba(22, 163, 74, .2);  color: #86efac; }
 .conn-status.offline { background: rgba(217, 119, 6, .25); color: #fcd34d; }
 
-/* ------------------------------- GRID CENTRAL ------------------------------- */
+/* ------------------------------- CENTRAL GRID ------------------------------- */
 .main-grid {
   display: grid;
   grid-template-columns: minmax(340px, 5fr) 7fr;
@@ -114,7 +114,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   border-radius: 12px;
 }
 
-/* ----------------------------- PAINEL ESQUERDO ----------------------------- */
+/* ----------------------------- LEFT PANEL ----------------------------- */
 .bodymap-layout {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) 1.2fr;
@@ -124,7 +124,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 #bodymap-slot { min-height: 320px; }
 #bodymap-slot:not(:has(svg))::before {
-  content: "[Dev 3] SVG anatômico aqui";
+  content: "[Dev 3] Anatomical SVG here";
   display: grid;
   place-items: center;
   min-height: 320px;
@@ -135,7 +135,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 #bodymap-slot svg { width: 100%; height: auto; max-height: 100%; }
 
-/* Grupos do SVG anatômico herdam a cor da classe st-* (Dev 3: use class="zone st-green") */
+/* Anatomical SVG groups inherit color from the st-* class (Dev 3: use class="zone st-green") */
 #bodymap-slot .zone {
   fill: var(--st, #475569);
   fill-opacity: .88;
@@ -165,7 +165,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .zone-card strong { font-size: 1rem; }
 .zone-status-label { font-size: .92rem; color: var(--text); opacity: .9; }
 
-/* ------------------------------ PAINEL DIREITO ------------------------------ */
+/* ------------------------------ RIGHT PANEL ------------------------------ */
 .clinical-header { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; }
 .clinical-header h2 { margin: 0; }
 
@@ -180,7 +180,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 
 .chart-container {
-  position: relative;      /* exigido pelo Chart.js responsivo */
+  position: relative;      /* required by responsive Chart.js */
   height: clamp(150px, 26vh, 240px);
   margin: .8rem 0;
   padding: .5rem;
@@ -202,7 +202,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .actions-box li.critical { font-weight: 800; color: #fecaca; }
 .didactic-box p { margin: 0; }
 
-/* ------------------------------ MÓDULO INFERIOR ------------------------------ */
+/* ------------------------------ BOTTOM MODULE ------------------------------ */
 .bottom-module {
   max-height: 36vh;
   overflow: auto;
@@ -278,7 +278,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ------------------------------- RESPONSIVO ------------------------------- */
+/* ------------------------------- RESPONSIVE ------------------------------- */
 @media (max-width: 900px) {
   body { height: auto; overflow: auto; display: block; }
   .main-grid { grid-template-columns: 1fr; }
@@ -287,7 +287,7 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   .tabs-bar, .tab-buttons { flex-wrap: wrap; flex-direction: column; }
 }
 
-/* ======================== [DEV 3] Mapa corporal (SVG) ======================== */
+/* ======================== [DEV 3] Body map (SVG) ======================== */
 #body-map { display: block; }
 #body-map .body-base, #body-map .body-base * { fill: #223152; stroke: none; }
 #body-map .body-zone { outline: none; }

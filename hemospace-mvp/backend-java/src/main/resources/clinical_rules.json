@@ -1,32 +1,32 @@
 {
-  "_note": "Documentação das regras. HemodynamicService usa constantes equivalentes (topo da classe). Qualquer mudança aqui deve ser espelhada em HemodynamicService.java E no LocalEngine do api.js.",
+  "_note": "Rules documentation. HemodynamicService uses equivalent constants (top of the class). Any change here must be mirrored in HemodynamicService.java AND in the LocalEngine of api.js.",
   "indicators": {
     "map": { "unit": "mmHg", "blue_below": 70, "green_max_inclusive": 100, "above_100": "YELLOW (RED pendente)" },
     "abi": {
       "unit": "index", "blue_max_inclusive": 0.90, "green_max_inclusive": 1.40, "above_1_40": "YELLOW",
-      "source": "AHA/ACC: <=0,90 anormal; >1,40 artérias não compressíveis",
-      "decision": "a equipe adotou 1,40 (e não 1,30)",
-      "caveat": "ITB é validado para doença arterial periférica; aqui é sinal de perfusão distal (adaptação do projeto)"
+      "source": "AHA/ACC: <=0.90 abnormal; >1.40 non-compressible arteries",
+      "decision": "the team adopted 1.40 (not 1.30)",
+      "caveat": "ABI is validated for peripheral arterial disease; here it is a distal perfusion signal (project adaptation)"
     },
     "pulse_pressure": {
       "unit": "mmHg", "red_below": 25, "red_below_fraction_of_systolic": 0.25,
       "green_max_inclusive": 60, "above_60": "YELLOW",
-      "note": "vermelho se absoluta (<25 mmHg) OU proporcional (<25% da sistólica)"
+      "note": "red if absolute (<25 mmHg) OR proportional (<25% of systolic)"
     },
     "capillary_refill": {
       "unit": "s", "yellow_above": 2.0, "zone": "upper_limbs", "max_severity": "YELLOW",
-      "status": "PROVISORIO - confirmar com revisor de saúde"
+      "status": "PROVISIONAL - confirm with health reviewer"
     }
   },
   "informational_only": {
-    "calf_circumference_cm": "validado, mas não entra em nenhuma regra (o frontend envia 35,0 + variação)"
+    "calf_circumference_cm": "validated, but not used in any rule (the frontend sends 35.0 + variation)"
   },
   "gravity_profiles": ["0G_ORBIT", "1_6G_MOON", "3_8G_MARS", "1G_EARTH"],
   "provisional_rules": {
-    "head_neck": "jugular DILATED + ITB<=0,90 = RED; só jugular = YELLOW; só ITB<=0,90 = YELLOW (rebaixa de verde)",
+    "head_neck": "jugular DILATED + ABI<=0.90 = RED; jugular only = YELLOW; ABI<=0.90 only = YELLOW (downgrades from green)",
     "orthostatic_alert": {
       "gravity": ["3_8G_MARS", "1G_EARTH"], "hr_min_bpm": 95, "pp_max_mmhg": 30,
-      "status": "HEURISTICA DE DEMONSTRACAO - sem base clínica validada"
+      "status": "DEMO HEURISTIC - no validated clinical basis"
     }
   }
 }

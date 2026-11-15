@@ -1,10 +1,10 @@
 /* ==========================================================================
-   panel.js | Dev 4: Frontend Clínico (Painel & Gráficos)
+   panel.js | Dev 4: Clinical Frontend (Panel & Charts)
    Contrato: ClinicalPanel.render(zoneKey, data)   (data = AstronautStateResponse)
-   Usa os IDs que já existem no index.html do Dev 1:
+   Uses the IDs that already exist in Dev 1's index.html:
      panel-zone-title, panel-nasa-badge, history-chart,
      panel-didactic-box, panel-didactic-text, panel-actions-list
-   Usa as classes do styles.css: st-blue | st-green | st-amber | st-red | critical
+   Uses the styles.css classes: st-blue | st-green | st-amber | st-red | critical
    ========================================================================== */
 (function () {
   'use strict';
@@ -12,65 +12,65 @@
   const ST_CLASS = { BLUE: 'st-blue', GREEN: 'st-green', YELLOW: 'st-amber', RED: 'st-red' };
   const ALL_ST = ['st-blue', 'st-green', 'st-amber', 'st-red'];
 
-  /* Cores das linhas: neutras de propósito (não competem com as 4 cores de status). */
+  /* Line colors: deliberately neutral (they do not compete with the 4 status colors). */
   const SERIES = {
-    map: { label: 'PAM (mmHg)',   color: '#38bdf8', axis: 'y'  },
-    hr:  { label: 'FC (bpm)',     color: '#c4b5fd', axis: 'y'  },
-    abi: { label: 'ITB (índice)', color: '#5eead4', axis: 'y1' }
+    map: { label: 'MAP (mmHg)',   color: '#38bdf8', axis: 'y'  },
+    hr:  { label: 'HR (bpm)',     color: '#c4b5fd', axis: 'y'  },
+    abi: { label: 'ABI (index)', color: '#5eead4', axis: 'y1' }
   };
 
-  /* ---------- Conteúdo didático por zona ---------- */
+  /* ---------- Didactic content per zone ---------- */
   const ZONES = {
     head_neck: {
-      title: 'Cabeça e Pescoço',
-      hazard: 'Campos gravitacionais alterados (risco SANS)',
+      title: 'Head and Neck',
+      hazard: 'Altered gravitational fields (SANS risk)',
       series: ['abi', 'hr'],
-      why: 'Sem gravidade, o sangue e outros fluidos sobem das pernas para a cabeça. ' +
-           'O excesso de fluido aumenta a pressão dentro do crânio e pode afetar o nervo óptico, ' +
-           'prejudicando a visão (síndrome SANS).',
-      cause: 'Os fluidos migraram para cima e estão congestionando a veia jugular.',
+      why: 'Without gravity, blood and other fluids shift upward from the legs to the head. ' +
+           'The excess fluid raises pressure inside the skull and can affect the optic nerve, ' +
+           'impairing vision (SANS syndrome).',
+      cause: 'Fluids have shifted upward and are congesting the jugular vein.',
       protocols: [
-        'Aplicar cintas de contenção nas coxas (Braslet)',
-        'Elevar o tronco durante o repouso',
-        'Realizar exame ocular de controle'
+        'Apply thigh constriction cuffs (Braslet)',
+        'Elevate the torso during rest',
+        'Perform a follow-up eye exam'
       ]
     },
     thorax_heart: {
-      title: 'Tórax e Coração',
-      hazard: 'Campos gravitacionais alterados',
+      title: 'Thorax and Heart',
+      hazard: 'Altered gravitational fields',
       series: ['map', 'hr'],
-      why: 'Em microgravidade o volume de plasma cai cerca de 10–15% e o coração trabalha menos. ' +
-           'Acompanhar PAM, pressão de pulso e frequência cardíaca mostra se o coração está perdendo condicionamento.',
-      cause: 'Há menos sangue circulando e o coração está menos exigido.',
+      why: 'In microgravity, plasma volume drops by about 10–15% and the heart works less. ' +
+           'Tracking MAP, pulse pressure and heart rate shows whether the heart is deconditioning.',
+      cause: 'Less blood is circulating and the heart is under less demand.',
       protocols: [
-        'Manter exercício aeróbico diário',
-        'Hidratação isotônica se a PAM estiver abaixo de 70 mmHg',
-        'Suspender atividade extraveicular (EVA) se a pressão de pulso estiver abaixo de 25 mmHg'
+        'Maintain daily aerobic exercise',
+        'Isotonic hydration if MAP is below 70 mmHg',
+        'Suspend extravehicular activity (EVA) if pulse pressure is below 25 mmHg'
       ]
     },
     upper_limbs: {
-      title: 'Membros Superiores',
-      hazard: 'Ambiente hostil e fechado (estresse fisiológico)',
+      title: 'Upper Limbs',
+      hazard: 'Hostile, enclosed environment (physiological stress)',
       series: ['map'],
-      why: 'O braço é a nossa medida de referência: a pressão medida aqui alimenta o cálculo da PAM e do ITB. ' +
-           'Ela também mostra se o sangue chega bem à ponta dos dedos.',
-      cause: 'A pressão sistêmica saiu da faixa normal ou há estresse cardiovascular agudo.',
+      why: 'The arm is our reference measurement: the pressure measured here feeds the MAP and ABI calculations. ' +
+           'It also shows whether blood is reaching the fingertips well.',
+      cause: 'Systemic pressure has left the normal range or there is acute cardiovascular stress.',
       protocols: [
-        'Repouso e redução de sódio se a PAM estiver acima de 100 mmHg',
-        'Repetir a medição após 5 minutos de repouso'
+        'Rest and sodium reduction if MAP is above 100 mmHg',
+        'Repeat the measurement after 5 minutes of rest'
       ]
     },
     lower_limbs: {
-      title: 'Membros Inferiores',
-      hazard: 'Campos gravitacionais alterados (risco de síncope no pouso)',
+      title: 'Lower Limbs',
+      hazard: 'Altered gravitational fields (risk of syncope on landing)',
       series: ['abi'],
-      why: 'Sem gravidade, cerca de 2 litros de fluido migram das pernas para o tórax e a cabeça. ' +
-           'Um ITB abaixo de 0,90 indica déficit de circulação nas pernas e alto risco de desmaio ao voltar à gravidade.',
-      cause: 'O fluido saiu das pernas e o sangue chega ao tornozelo com menos pressão.',
+      why: 'Without gravity, about 2 liters of fluid shift from the legs to the thorax and head. ' +
+           'An ABI below 0.90 indicates a circulation deficit in the legs and a high risk of fainting on return to gravity.',
+      cause: 'Fluid has left the legs and blood reaches the ankle at lower pressure.',
       protocols: [
-        'Sessão de 20 min na câmara LBNP (pressão negativa inferior)',
-        'Exercício resistido de membros inferiores',
-        'Ingerir 500 ml de solução eletrolítica antes de transições gravitacionais'
+        '20-min session in the LBNP chamber (lower body negative pressure)',
+        'Lower-limb resistance exercise',
+        'Drink 500 ml of electrolyte solution before gravitational transitions'
       ]
     }
   };
@@ -78,10 +78,10 @@
   let chart = null;
   const $ = (id) => document.getElementById(id);
 
-  /* ---------- Histórico de 7 dias ---------- */
-  /* O backend manda data.history = [{ mission_day, map_mmhg, abi_index, heart_rate_bpm } x7].
-     O ponto "Hoje" é sobrescrito com a leitura atual (computed_metrics), para o gráfico
-     acompanhar o que o usuário acabou de medir ou o cenário carregado. */
+  /* ---------- 7-day history ---------- */
+  /* The backend sends data.history = [{ mission_day, map_mmhg, abi_index, heart_rate_bpm } x7].
+     The "Today" point is overwritten with the current reading (computed_metrics), so the chart
+     follows what the user just measured or the loaded scenario. */
   function getSeries(data) {
     const src = Array.isArray(data.history) ? data.history.slice(-7) : [];
     const pts = src.map((h) => ({
@@ -107,7 +107,7 @@
     return pts;
   }
 
-  /* ---------- Gráfico ---------- */
+  /* ---------- Chart ---------- */
   function drawChart(zoneKey, data) {
     const canvas = $('history-chart');
     if (!canvas) return;
@@ -115,7 +115,7 @@
     const pts = getSeries(data);
     const wrap = canvas.parentElement;
 
-    /* Fallback se o Chart.js não carregou (internet caiu) ou se não há dados */
+    /* Fallback if Chart.js did not load (internet down) or if there is no data */
     let fb = $('panel-chart-fallback');
     if (typeof Chart === 'undefined' || !pts.length) {
       canvas.style.display = 'none';
@@ -126,14 +126,14 @@
       }
       const last = pts[pts.length - 1];
       fb.textContent = last
-        ? 'Gráfico indisponível. Hoje: PAM ' + last.map + ' mmHg · ITB ' + last.abi + ' · FC ' + last.hr + ' bpm'
-        : 'Sem histórico disponível.';
+        ? 'Chart unavailable. Today: MAP ' + last.map + ' mmHg · ABI ' + last.abi + ' · HR ' + last.hr + ' bpm'
+        : 'No history available.';
       return;
     }
     canvas.style.display = '';
     if (fb) fb.remove();
 
-    const labels = pts.map((p, i) => (i === pts.length - 1 ? 'Hoje' : 'Dia ' + p.day));
+    const labels = pts.map((p, i) => (i === pts.length - 1 ? 'Today' : 'Day ' + p.day));
     const datasets = Object.keys(SERIES).map((key) => ({
       label: SERIES[key].label,
       data: pts.map((p) => p[key]),
@@ -144,7 +144,7 @@
       pointRadius: 5,
       pointHoverRadius: 7,
       tension: 0.25,
-      hidden: !cfg.series.includes(key) /* as outras ficam ativáveis pela legenda */
+      hidden: !cfg.series.includes(key) /* the others can be enabled via the legend */
     }));
 
     const text = '#e8eefb';
@@ -176,7 +176,7 @@
             position: 'right',
             min: 0.5,
             max: 1.5,
-            title: { display: true, text: 'ITB', color: text, font: { size: 13 } },
+            title: { display: true, text: 'ABI', color: text, font: { size: 13 } },
             ticks: { color: text, font: { size: 13 } },
             grid: { drawOnChartArea: false }
           }
@@ -185,7 +185,7 @@
     });
   }
 
-  /* ---------- Bloco didático ---------- */
+  /* ---------- Didactic block ---------- */
   function fillDidactic(cfg, isAlert) {
     const text = $('panel-didactic-text');
     if (text) text.textContent = cfg.why;
@@ -193,7 +193,7 @@
     const box = $('panel-didactic-box');
     if (!box) return;
 
-    /* Linha do perigo NASA (criada aqui para não precisar mexer no index.html) */
+    /* NASA hazard line (created here to avoid touching index.html) */
     let hz = $('panel-hazard');
     if (!hz) {
       hz = document.createElement('p');
@@ -201,9 +201,9 @@
       hz.style.cssText = 'margin-top:.5rem;font-size:.9rem;opacity:.85';
       box.appendChild(hz);
     }
-    hz.textContent = 'Perigo NASA: ' + cfg.hazard;
+    hz.textContent = 'NASA Hazard: ' + cfg.hazard;
 
-    /* Regra obrigatória: amarelo/vermelho mostra causa fisiológica + protocolo juntos */
+    /* Mandatory rule: yellow/red shows physiological cause + protocol together */
     let cause = $('panel-cause');
     if (!cause) {
       cause = document.createElement('p');
@@ -212,24 +212,24 @@
       box.appendChild(cause);
     }
     cause.hidden = !isAlert;
-    cause.textContent = isAlert ? 'Causa provável: ' + cfg.cause : '';
+    cause.textContent = isAlert ? 'Probable cause: ' + cfg.cause : '';
   }
 
-  /* ---------- Ações e contramedidas ---------- */
+  /* ---------- Actions and countermeasures ---------- */
   function fillActions(zone, cfg, isAlert) {
     const list = $('panel-actions-list');
     if (!list) return;
     list.innerHTML = '';
 
     const main = document.createElement('li');
-    if (isAlert) main.className = 'critical'; /* classe já estilizada no styles.css */
+    if (isAlert) main.className = 'critical'; /* class already styled in styles.css */
     const tag = document.createElement('strong');
-    tag.textContent = 'Ação imediata: ';
+    tag.textContent = 'Immediate action: ';
     main.appendChild(tag);
-    main.appendChild(document.createTextNode(zone.action || 'Nenhuma intervenção necessária.'));
+    main.appendChild(document.createTextNode(zone.action || 'No intervention required.'));
     list.appendChild(main);
 
-    /* Contramedidas extras só quando a zona não está verde */
+    /* Extra countermeasures only when the zone is not green */
     if (zone.status !== 'GREEN') {
       cfg.protocols.forEach((p) => {
         const li = document.createElement('li');
@@ -239,7 +239,7 @@
     }
   }
 
-  /* ---------- API pública ---------- */
+  /* ---------- Public API ---------- */
   function render(zoneKey, data) {
     const cfg = ZONES[zoneKey];
     const zone = data && data.zones && data.zones[zoneKey];
@@ -248,7 +248,7 @@
     const isAlert = zone.status === 'YELLOW' || zone.status === 'RED';
 
     const title = $('panel-zone-title');
-    if (title) title.textContent = 'Diagnóstico: ' + cfg.title;
+    if (title) title.textContent = 'Diagnosis: ' + cfg.title;
 
     const badge = $('panel-nasa-badge');
     if (badge) {
@@ -257,7 +257,7 @@
       badge.classList.add(ST_CLASS[zone.status] || 'st-green');
     }
 
-    /* A borda do bloco de ações usa a cor do status via --st (styles.css) */
+    /* The actions block border uses the status color via --st (styles.css) */
     const actionsBox = $('panel-actions-box');
     if (actionsBox) {
       actionsBox.classList.remove(...ALL_ST);
@@ -270,5 +270,5 @@
   }
 
   window.ClinicalPanel = { render };
-  window.updateClinicalPanel = render; /* alias usado na especificação do Dev 4 */
+  window.updateClinicalPanel = render; /* alias used in Dev 4's specification */
 })();

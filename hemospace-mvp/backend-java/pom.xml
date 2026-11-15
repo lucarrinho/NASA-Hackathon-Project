@@ -15,7 +15,7 @@
   <artifactId>hemospace-backend</artifactId>
   <version>1.0.0</version>
   <name>hemospace-backend</name>
-  <description>HemoSpace - Monitor Hemodinâmico Regional (NASA Space Apps)</description>
+  <description>HemoSpace - Regional Hemodynamic Monitor (NASA Space Apps)</description>
 
   <properties>
     <java.version>17</java.version>
