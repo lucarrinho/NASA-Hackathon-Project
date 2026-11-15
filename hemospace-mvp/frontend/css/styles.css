@@ -302,3 +302,5 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   24% { transform: scale(1); } 36% { transform: scale(1.14); } 48% { transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) { #body-map .heart-pulse.is-beating { animation: none; } }
+#body-map #gravity-label { fill: #e8eefb; font: 600 15px system-ui, sans-serif; pointer-events: none; }
+#body-map .flow-partial { stroke-dasharray: 10 8; }

@@ -37,11 +37,32 @@
     else el.setAttribute('display', 'none');
   }
 
-  // 0G -> fluxo cefálico (seta p/ cima); 1G -> fluxo distal (seta p/ baixo).
-  // Lua e Marte: sem seta até a equipe definir uma regra visual explícita.
+  // REGRA VISUAL DE GRAVIDADE (proposta simples; validar com a equipe):
+  //  - 0g: fluxo cefálico (seta p/ cima, cheia).
+  //  - 1g: fluxo distal (seta p/ baixo, cheia).
+  //  - Lua (1/6g) e Marte (3/8g): ainda há gravidade, então a seta aponta p/ baixo como em 1g,
+  //    mas tracejada e mais fraca, proporcional à gravidade (Marte > Lua). É só um recurso
+  //    visual: não representa medição nem diagnóstico.
+  const GRAVITY_VIEW = {
+    '0G_ORBIT':  { text: '0 g · fluxo cefálico',          arrow: 'up',   strength: 1,    partial: false },
+    '1_6G_MOON': { text: '1/6 g · fluxo distal parcial',  arrow: 'down', strength: 0.45, partial: true },
+    '3_8G_MARS': { text: '3/8 g · fluxo distal parcial',  arrow: 'down', strength: 0.7,  partial: true },
+    '1G_EARTH':  { text: '1 g · fluxo distal',            arrow: 'down', strength: 1,    partial: false }
+  };
+
   function updateFlowDirection(gravityProfile) {
-    setShown(document.getElementById('flow-up'), gravityProfile === '0G_ORBIT');
-    setShown(document.getElementById('flow-down'), gravityProfile === '1G_EARTH');
+    const view = GRAVITY_VIEW[gravityProfile];
+    const up = document.getElementById('flow-up');
+    const down = document.getElementById('flow-down');
+    const label = document.getElementById('gravity-label');
+    setShown(up, !!view && view.arrow === 'up');
+    setShown(down, !!view && view.arrow === 'down');
+    [up, down].forEach((el) => {
+      if (!el) return;
+      el.setAttribute('opacity', view ? String(view.strength) : '1');
+      el.classList.toggle('flow-partial', !!view && view.partial);
+    });
+    if (label) label.textContent = view ? view.text : '';
   }
 
   // Apenas velocidade visual: duração do ciclo = 60 / bpm (não classifica a FC).
